@@ -5,11 +5,11 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
 
-from db import get_session
-from i18n import t
-from models import CategorizationRule, Category, Transaction
-from routes.helpers import lang
-from services.payloads import category_payload, normalize_color
+from expense_tracker.db import get_session
+from expense_tracker.i18n import t
+from expense_tracker.models import CategorizationRule, Category, Transaction
+from expense_tracker.routes.helpers import lang
+from expense_tracker.services.payloads import category_payload, normalize_color
 
 bp = Blueprint("categories", __name__)
 

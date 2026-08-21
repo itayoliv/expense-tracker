@@ -13,8 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from categorizer import categorize_transaction, category_map, load_rules
-from models import Transaction
+from expense_tracker.categorizer import categorize_transaction, category_map, load_rules
+from expense_tracker.models import Transaction
 
 EXCEL_EPOCH = datetime(1899, 12, 30)
 

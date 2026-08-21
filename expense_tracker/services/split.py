@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from categorizer import apply_description, remember_rule
-from models import Category, Transaction
+from expense_tracker.categorizer import apply_description, remember_rule
+from expense_tracker.models import Category, Transaction
 
 
 def _parse_splits(raw: Any) -> list[dict[str, Any]]:

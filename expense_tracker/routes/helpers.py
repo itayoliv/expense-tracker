@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import request
 
-from i18n import get_lang
+from expense_tracker.i18n import get_lang
 
 
 def lang() -> str:

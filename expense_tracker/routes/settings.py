@@ -5,16 +5,16 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from sqlalchemy import delete, func, select
 
-from db import get_session, seed_defaults
-from gpt_sort import (
+from expense_tracker.db import get_session, seed_defaults
+from expense_tracker.gpt_sort import (
     GptSortError,
     clear_api_key,
     save_api_key,
     sort_unsorted_expenses,
 )
-from i18n import t
-from models import CategorizationRule, Transaction
-from routes.helpers import lang
+from expense_tracker.i18n import t
+from expense_tracker.models import CategorizationRule, Transaction
+from expense_tracker.routes.helpers import lang
 
 bp = Blueprint("settings", __name__)
 

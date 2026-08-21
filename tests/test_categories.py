@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import func, select
 
-import db
-from models import CategorizationRule, Category, Transaction
+import expense_tracker.db as db
+from expense_tracker.models import CategorizationRule, Category, Transaction
 
 DEFAULT_HEBREW_NAMES = {"הלוואות ומשכנתא", "תרבות ופנאי", "ביטוח"}
 

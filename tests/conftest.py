@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-import db
-from app import app
+import expense_tracker.db as db
+from expense_tracker import create_app
+
+app = create_app()
 
 
 @pytest.fixture(autouse=True)
@@ -15,7 +17,7 @@ def _no_real_openai(monkeypatch):
     def _blocked(*_args, **_kwargs):
         raise AssertionError("ask_openai must be mocked in tests")
 
-    monkeypatch.setattr("gpt_sort.ask_openai", _blocked)
+    monkeypatch.setattr("expense_tracker.gpt_sort.ask_openai", _blocked)
 
 
 @pytest.fixture()

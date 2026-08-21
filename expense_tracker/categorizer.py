@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from models import CategorizationRule, Category, Transaction
+from expense_tracker.models import CategorizationRule, Category, Transaction
 
 
 def load_rules(session: Session) -> list[CategorizationRule]:

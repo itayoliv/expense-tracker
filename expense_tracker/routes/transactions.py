@@ -6,18 +6,18 @@ from datetime import datetime
 
 from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
-from categorizer import (
+from expense_tracker.categorizer import (
     apply_to_similar_all,
     apply_to_similar_unsorted,
     categorize_transaction,
     remember_rule,
 )
-from db import get_session
-from i18n import t
-from models import Category, Transaction
-from routes.helpers import lang
-from services.dates import parse_txn_date
-from services.split import split_transaction
+from expense_tracker.db import get_session
+from expense_tracker.i18n import t
+from expense_tracker.models import Category, Transaction
+from expense_tracker.routes.helpers import lang
+from expense_tracker.services.dates import parse_txn_date
+from expense_tracker.services.split import split_transaction
 
 bp = Blueprint("transactions", __name__)
 

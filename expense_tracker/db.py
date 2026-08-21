@@ -8,9 +8,11 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from models import Base, Category
+from expense_tracker.models import Base, Category
 
-ROOT = Path(__file__).resolve().parent
+PACKAGE_DIR = Path(__file__).resolve().parent
+ROOT = PACKAGE_DIR.parent
+ENV_PATH = PACKAGE_DIR / ".env"
 
 
 def _load_env_file(path: Path) -> None:
@@ -31,9 +33,9 @@ def _load_env_file(path: Path) -> None:
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(ROOT / ".env")
+    load_dotenv(ENV_PATH)
 except ImportError:
-    _load_env_file(ROOT / ".env")
+    _load_env_file(ENV_PATH)
 
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -93,6 +95,15 @@ SEED_CATEGORIES = [
         "color": "#3B82F6",
         "icon": "umbrella",
         "sort_order": 20,
+        "kind": "expense",
+    },
+    {
+        "key": "health",
+        "name_en": "Health",
+        "name_he": "בריאות",
+        "color": "#E11D48",
+        "icon": "heart",
+        "sort_order": 25,
         "kind": "expense",
     },
     {
@@ -299,7 +310,7 @@ def _backfill_split_groups() -> None:
     import re
     from uuid import uuid4
 
-    from models import Transaction
+    from expense_tracker.models import Transaction
 
     if engine is None or SessionLocal is None:
         return

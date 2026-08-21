@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-import db
-from models import Category, Transaction
+import expense_tracker.db as db
+from expense_tracker.models import Category, Transaction
 
 
 def _id_by_name_en(client, name_en: str) -> int:
@@ -30,7 +30,7 @@ def _add_txn(client, description, amount, direction, date, details=""):
 
 
 def test_group_unsorted_names_collapses_same_description():
-    from gpt_sort import group_unsorted_names
+    from expense_tracker.gpt_sort import group_unsorted_names
 
     class Row:
         def __init__(self, description, details=""):
@@ -48,7 +48,7 @@ def test_group_unsorted_names_collapses_same_description():
 
 
 def test_parse_gpt_json_matches_en_he_and_id():
-    from gpt_sort import parse_gpt_json
+    from expense_tracker.gpt_sort import parse_gpt_json
 
     shopping = Category(id=1, name_en="Shopping", name_he="קניות", kind="expense")
     fuel = Category(
@@ -68,7 +68,7 @@ def test_parse_gpt_json_matches_en_he_and_id():
 
 
 def test_parse_gpt_json_skips_unknown_category_and_name():
-    from gpt_sort import parse_gpt_json
+    from expense_tracker.gpt_sort import parse_gpt_json
 
     shopping = Category(id=1, name_en="Shopping", name_he="קניות", kind="expense")
     parsed = parse_gpt_json(
@@ -82,7 +82,7 @@ def test_parse_gpt_json_skips_unknown_category_and_name():
 def test_ask_openai_http_falls_back_to_curl_when_avg_blocks(monkeypatch):
     import urllib.request
 
-    import gpt_sort
+    import expense_tracker.gpt_sort as gpt_sort
 
     def boom(*_a, **_k):
         raise PermissionError(
@@ -127,8 +127,8 @@ def test_gpt_sort_groups_and_applies_only_unsorted(client, monkeypatch):
         captured["names"] = sorted(item["name"] for item in names)
         return {"Fuel and transport": ["פז"], "Shopping": ["ZARA"]}
 
-    monkeypatch.setattr("gpt_sort.ask_openai", fake_ask)
-    monkeypatch.setattr("gpt_sort.get_api_key", lambda: "sk-test")
+    monkeypatch.setattr("expense_tracker.gpt_sort.ask_openai", fake_ask)
+    monkeypatch.setattr("expense_tracker.gpt_sort.get_api_key", lambda: "sk-test")
 
     res = client.post("/api/gpt/sort")
     assert res.status_code == 200
@@ -152,10 +152,10 @@ def test_gpt_sort_groups_and_applies_only_unsorted(client, monkeypatch):
 def test_gpt_sort_ignores_unknown_category_and_name(client, monkeypatch):
     _add_txn(client, "פז", 50, "debit", "2026-08-01")
     monkeypatch.setattr(
-        "gpt_sort.ask_openai",
+        "expense_tracker.gpt_sort.ask_openai",
         lambda *_a, **_k: {"No Such Category": ["פז"], "Shopping": ["not in list"]},
     )
-    monkeypatch.setattr("gpt_sort.get_api_key", lambda: "sk-test")
+    monkeypatch.setattr("expense_tracker.gpt_sort.get_api_key", lambda: "sk-test")
     res = client.post("/api/gpt/sort")
     assert res.status_code == 200
     body = res.get_json()
@@ -170,9 +170,9 @@ def test_manual_patch_clears_gpt_tag(client, monkeypatch):
     shopping_id = _id_by_name_en(client, "Shopping")
     tid = _add_txn(client, "ZARA", 80, "debit", "2026-08-02")
     monkeypatch.setattr(
-        "gpt_sort.ask_openai", lambda *_a, **_k: {"Shopping": ["ZARA"]}
+        "expense_tracker.gpt_sort.ask_openai", lambda *_a, **_k: {"Shopping": ["ZARA"]}
     )
-    monkeypatch.setattr("gpt_sort.get_api_key", lambda: "sk-test")
+    monkeypatch.setattr("expense_tracker.gpt_sort.get_api_key", lambda: "sk-test")
     assert client.post("/api/gpt/sort").status_code == 200
     with db.get_session() as session:
         assert session.get(Transaction, tid).categorized_by == "gpt"
@@ -190,9 +190,9 @@ def test_dashboard_shows_gpt_badge_and_sort_button(client, monkeypatch):
     html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
     assert 'id="btn-gpt-sort"' in html
     monkeypatch.setattr(
-        "gpt_sort.ask_openai", lambda *_a, **_k: {"Shopping": ["ZARA"]}
+        "expense_tracker.gpt_sort.ask_openai", lambda *_a, **_k: {"Shopping": ["ZARA"]}
     )
-    monkeypatch.setattr("gpt_sort.get_api_key", lambda: "sk-test")
+    monkeypatch.setattr("expense_tracker.gpt_sort.get_api_key", lambda: "sk-test")
     assert client.post("/api/gpt/sort").status_code == 200
     html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
     assert 'class="gpt-badge"' in html
@@ -203,7 +203,7 @@ def test_dashboard_shows_gpt_badge_and_sort_button(client, monkeypatch):
 
 
 def test_save_and_clear_openai_key(client, tmp_path):
-    from gpt_sort import get_api_key, openai_key_path
+    from expense_tracker.gpt_sort import get_api_key, openai_key_path
 
     res = client.post(
         "/api/settings/openai-key",

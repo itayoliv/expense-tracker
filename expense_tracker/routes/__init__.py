@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from flask import Flask
 
-from routes.categories import bp as categories_bp
-from routes.pages import bp as pages_bp
-from routes.rules import bp as rules_bp
-from routes.settings import bp as settings_bp
-from routes.transactions import bp as transactions_bp
+from expense_tracker.routes.categories import bp as categories_bp
+from expense_tracker.routes.pages import bp as pages_bp
+from expense_tracker.routes.rules import bp as rules_bp
+from expense_tracker.routes.settings import bp as settings_bp
+from expense_tracker.routes.transactions import bp as transactions_bp
 
 
 def register_blueprints(app: Flask) -> None:

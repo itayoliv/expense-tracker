@@ -146,8 +146,8 @@ def test_import_accepts_multiple_files(client):
 
     from sqlalchemy import func, select
 
-    import db
-    from models import Transaction
+    import expense_tracker.db as db
+    from expense_tracker.models import Transaction
     from tests.test_importer import _isracard_bytes
 
     payload = _isracard_bytes()
@@ -212,9 +212,9 @@ def test_unsorted_banner_shows_details_newest_first(client):
 def test_dashboard_shows_source_badges(client):
     from sqlalchemy import select
 
-    import db
-    from importer import import_file
-    from models import Transaction
+    import expense_tracker.db as db
+    from expense_tracker.importer import import_file
+    from expense_tracker.models import Transaction
     from tests.test_importer import _bank_csv_bytes, _isracard_bytes
 
     hdr = {"X-Requested-With": "XMLHttpRequest"}

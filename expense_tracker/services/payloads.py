@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from categorizer import category_map
-from i18n import category_name
-from models import CategorizationRule, Category
+from expense_tracker.categorizer import category_map
+from expense_tracker.i18n import category_name
+from expense_tracker.models import CategorizationRule, Category
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 

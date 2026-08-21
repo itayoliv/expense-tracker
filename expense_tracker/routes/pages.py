@@ -6,14 +6,14 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy import select
 from werkzeug.utils import secure_filename
 
-from db import get_session
-from gpt_sort import has_api_key
-from i18n import html_dir, t
-from importer import import_file
-from models import Category
-from routes.helpers import lang, show_pie, view
-from services.payloads import category_payload, list_rule_payloads
-from services.summary import (
+from expense_tracker.db import get_session
+from expense_tracker.gpt_sort import has_api_key
+from expense_tracker.i18n import html_dir, t
+from expense_tracker.importer import import_file
+from expense_tracker.models import Category
+from expense_tracker.routes.helpers import lang, show_pie, view
+from expense_tracker.services.payloads import category_payload, list_rule_payloads
+from expense_tracker.services.summary import (
     available_months,
     build_summary,
     current_month_key,

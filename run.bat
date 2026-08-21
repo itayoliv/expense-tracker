@@ -10,10 +10,10 @@ if not exist ".venv\Scripts\python.exe" (
     exit /b 1
 )
 
-if not exist ".env" (
-    if exist ".env.example" (
-        copy /Y ".env.example" ".env" >nul
-        echo Created .env from .env.example
+if not exist "expense_tracker\.env" (
+    if exist "expense_tracker\.env.example" (
+        copy /Y "expense_tracker\.env.example" "expense_tracker\.env" >nul
+        echo Created expense_tracker\.env from .env.example
     )
 )
 
@@ -25,7 +25,7 @@ echo Press Ctrl+C in this window to stop the server.
 echo.
 
 start "" "http://127.0.0.1:5000"
-".venv\Scripts\python.exe" app.py
+".venv\Scripts\python.exe" -m expense_tracker
 
 echo.
 echo Server stopped.

@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parent
-LOCALES_DIR = ROOT / "locales"
+PACKAGE_DIR = Path(__file__).resolve().parent
+LOCALES_DIR = PACKAGE_DIR / "locales"
 SUPPORTED = ("en", "he")
 
 

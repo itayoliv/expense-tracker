@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from categorizer import category_map
-from db import get_session
-from i18n import t
-from models import CategorizationRule
-from routes.helpers import lang
-from services.payloads import (
+from expense_tracker.categorizer import category_map
+from expense_tracker.db import get_session
+from expense_tracker.i18n import t
+from expense_tracker.models import CategorizationRule
+from expense_tracker.routes.helpers import lang
+from expense_tracker.services.payloads import (
     ensure_unique_rule,
     list_rule_payloads,
     parse_rule_fields,

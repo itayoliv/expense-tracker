@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-import db
-from models import CategorizationRule, Transaction
+import expense_tracker.db as db
+from expense_tracker.models import CategorizationRule, Transaction
 
 
 def _id_by_name_en(client, name_en: str) -> int:
@@ -46,7 +46,7 @@ def test_seed_defaults_does_not_add_rules(client):
 
 
 def test_import_does_not_auto_categorize(client):
-    from importer import import_file
+    from expense_tracker.importer import import_file
     from tests.test_importer import _isracard_bytes
 
     with db.get_session() as session:
@@ -59,8 +59,8 @@ def test_import_does_not_auto_categorize(client):
 
 
 def test_credits_stay_unsorted_without_rule():
-    from categorizer import match_category_id
-    from models import Category
+    from expense_tracker.categorizer import match_category_id
+    from expense_tracker.models import Category
 
     cats = {
         1: Category(

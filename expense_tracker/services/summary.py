@@ -8,8 +8,8 @@ from typing import Any
 from sqlalchemy import extract, func, select
 from sqlalchemy.orm import joinedload
 
-from i18n import category_name, t
-from models import Transaction
+from expense_tracker.i18n import category_name, t
+from expense_tracker.models import Transaction
 
 
 def parse_month(raw: str | None) -> tuple[int, int] | None:

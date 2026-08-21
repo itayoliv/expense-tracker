@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-import db
-from models import CategorizationRule, Transaction
+import expense_tracker.db as db
+from expense_tracker.models import CategorizationRule, Transaction
 
 
 def _id_by_name_en(client, name_en: str) -> int:

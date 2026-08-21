@@ -10,12 +10,12 @@ Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX 
 ## Quick start (Windows)
 
 1. **First time only** — double-click `install.bat`  
-   Creates `.venv`, installs dependencies, and copies `.env.example` → `.env` if needed.
+   Creates `.venv`, installs dependencies, and copies `expense_tracker/.env.example` → `expense_tracker/.env` if needed.
 2. **Every time** — double-click `run.bat`  
    Starts the server and opens [http://127.0.0.1:5000](http://127.0.0.1:5000).
 3. Press **Ctrl+C** in the console window to stop the server.
 
-Optional: edit `.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
+Optional: edit `expense_tracker/.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
 
 ## Manual setup
 
@@ -23,8 +23,8 @@ Optional: edit `.env` (or use **Settings** in the app) to set an OpenAI API key 
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
-python app.py
+copy expense_tracker\.env.example expense_tracker\.env
+python -m expense_tracker
 ```
 
 Then open [http://127.0.0.1:5000](http://127.0.0.1:5000).
@@ -48,14 +48,17 @@ Credit-card files are imported as **one expense per merchant**. When card detail
 
 ## Project layout
 
-- `app.py` — Flask entrypoint (registers blueprints, DB init)
-- `routes/` — HTTP blueprints (`pages`, `transactions`, `categories`, `rules`, `settings`)
-- `services/` — summary building and API payload helpers
-- Root domain modules: `models.py`, `db.py`, `importer.py`, `categorizer.py`, `gpt_sort.py`, `i18n.py`
-- `static/js/` — feature scripts (`core`, `pie`, `import`, `transactions`, `categories`, `rules`, `settings`)
+- `expense_tracker/` — application package (run with `python -m expense_tracker`)
+  - `__main__.py` — server entrypoint
+  - `.env` / `.env.example` — local config (`.env` is gitignored)
+  - `db.py`, `models.py`, `importer.py`, `categorizer.py`, `gpt_sort.py`, `i18n.py`
+  - `routes/` — HTTP blueprints
+  - `services/` — summary and API payload helpers
+  - `templates/`, `static/`, `locales/` — UI and translations
+- `data/` — SQLite DB and local secrets (gitignored DB files)
 - `install.bat` / `run.bat` — Windows first-time install and daily launch
 
-Personal bank exports under `files/`, the SQLite DB under `data/`, and `.env` are gitignored and should not be committed.
+Personal bank exports under `files/`, the SQLite DB under `data/`, and `expense_tracker/.env` are gitignored and should not be committed.
 
 ## Data
 

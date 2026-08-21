@@ -10,8 +10,8 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-import db
-from models import Category, Transaction
+import expense_tracker.db as db
+from expense_tracker.models import Category, Transaction
 
 GPT_MODEL = os.environ.get("OPENAI_MODEL") or "gpt-4o-mini"
 
