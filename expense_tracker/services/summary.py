@@ -1,4 +1,4 @@
-"""Dashboard summary building, month filters, and source labels."""
+"""Dashboard summary building, month/date filters, and source labels."""
 
 from __future__ import annotations
 
@@ -22,6 +22,16 @@ def parse_month(raw: str | None) -> tuple[int, int] | None:
             return None
         return parsed
     except (ValueError, AttributeError):
+        return None
+
+
+def parse_iso_date(raw: str | None) -> date | None:
+    text = (raw or "").strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
         return None
 
 
@@ -59,6 +69,21 @@ def month_filter(query, month: tuple[int, int] | None):
             extract("year", billing) == y,
             extract("month", billing) == m,
         )
+    return query
+
+
+def date_range_filter(query, date_from: date | None, date_to: date | None):
+    """Filter by billing date inclusive range. Either bound may be open."""
+    if not date_from and not date_to:
+        return query
+    billing = billing_date_expr()
+    start, end = date_from, date_to
+    if start and end and start > end:
+        start, end = end, start
+    if start:
+        query = query.where(billing >= start)
+    if end:
+        query = query.where(billing <= end)
     return query
 
 
@@ -134,9 +159,20 @@ def is_bank_card_lump(txn) -> bool:
     return source_kind(txn) != "card"
 
 
-def build_summary(session, view: str, month: tuple[int, int] | None, lang: str) -> dict:
+def build_summary(
+    session,
+    view: str,
+    month: tuple[int, int] | None,
+    lang: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict:
     base = select(Transaction).options(joinedload(Transaction.category))
-    base = month_filter(base, month)
+    if date_from or date_to:
+        base = date_range_filter(base, date_from, date_to)
+    else:
+        base = month_filter(base, month)
     txns = list(session.scalars(base).unique().all())
 
     # Avoid double-counting: when card merchant details exist, hide bank card lumps

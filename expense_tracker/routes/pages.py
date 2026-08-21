@@ -17,6 +17,7 @@ from expense_tracker.services.summary import (
     available_months,
     build_summary,
     current_month_key,
+    parse_iso_date,
     parse_month,
 )
 
@@ -46,12 +47,23 @@ def dashboard():
     current_view = view()
     current_month = current_month_key()
 
+    date_from = parse_iso_date(request.args.get("date_from"))
+    date_to = parse_iso_date(request.args.get("date_to"))
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from
+    using_range = date_from is not None or date_to is not None
+    date_from_raw = date_from.isoformat() if date_from else ""
+    date_to_raw = date_to.isoformat() if date_to else ""
+
     with get_session() as session:
         months = available_months(session)
         if months and current_month not in months:
             months = sorted({*months, current_month}, reverse=True)
 
-        if "month" not in request.args:
+        if using_range:
+            month_raw = "all"
+            month = None
+        elif "month" not in request.args:
             if months:
                 month_raw = current_month
                 month = parse_month(current_month)
@@ -65,12 +77,28 @@ def dashboard():
                 month_raw = current_month if months else "all"
                 month = parse_month(month_raw)
 
-        summary = build_summary(session, current_view, month, current_lang)
+        summary = build_summary(
+            session,
+            current_view,
+            month,
+            current_lang,
+            date_from=date_from,
+            date_to=date_to,
+        )
         categories = list(
             session.scalars(select(Category).order_by(Category.sort_order)).all()
         )
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
+
+    filter_period: dict[str, str] = {}
+    if using_range:
+        if date_from_raw:
+            filter_period["date_from"] = date_from_raw
+        if date_to_raw:
+            filter_period["date_to"] = date_to_raw
+    else:
+        filter_period["month"] = month_raw
 
     return render_template(
         "dashboard.html",
@@ -79,6 +107,10 @@ def dashboard():
         view=current_view,
         month=month_raw,
         months=months,
+        date_from=date_from_raw,
+        date_to=date_to_raw,
+        using_range=using_range,
+        filter_period=filter_period,
         summary=summary,
         categories=cats_json,
         rules=rules_json,

@@ -8,11 +8,11 @@
       <div class="nav-section">
         <div class="nav-label">{{ t('nav_snapshot') }}</div>
         <a class="nav-link {% if view == 'expenses' %}active{% endif %}"
-           href="{{ url_for('pages.dashboard', view='expenses', month=month) }}">{{ t('expenses') }}</a>
+           href="{{ url_for('pages.dashboard', view='expenses', **filter_period) }}">{{ t('expenses') }}</a>
         <a class="nav-link {% if view == 'income' %}active{% endif %}"
-           href="{{ url_for('pages.dashboard', view='income', month=month) }}">{{ t('income') }}</a>
+           href="{{ url_for('pages.dashboard', view='income', **filter_period) }}">{{ t('income') }}</a>
         <a class="nav-link {% if view == 'bottom' %}active{% endif %}"
-           href="{{ url_for('pages.dashboard', view='bottom', month=month) }}">{{ t('bottom_line') }}</a>
+           href="{{ url_for('pages.dashboard', view='bottom', **filter_period) }}">{{ t('bottom_line') }}</a>
       </div>
       <div class="nav-section">
         <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
@@ -29,9 +29,9 @@
       <span class="lang-label">{{ t('language') }}</span>
       <div class="lang-btns">
         <a class="lang-btn {% if lang == 'en' %}active{% endif %}"
-           href="{{ url_for('pages.set_lang', lang='en', next=url_for('pages.dashboard', view=view, month=month)) }}">EN</a>
+           href="{{ url_for('pages.set_lang', lang='en', next=url_for('pages.dashboard', view=view, **filter_period)) }}">EN</a>
         <a class="lang-btn {% if lang == 'he' %}active{% endif %}"
-           href="{{ url_for('pages.set_lang', lang='he', next=url_for('pages.dashboard', view=view, month=month)) }}">עב</a>
+           href="{{ url_for('pages.set_lang', lang='he', next=url_for('pages.dashboard', view=view, **filter_period)) }}">עב</a>
       </div>
     </div>
   </aside>
@@ -44,15 +44,24 @@
           {% elif view == 'income' %}{{ t('income') }}
           {% else %}{{ t('bottom_line') }}{% endif %}
         </h1>
-        <form class="month-form" method="get" action="{{ url_for('pages.dashboard') }}">
+        <form class="period-form" method="get" action="{{ url_for('pages.dashboard') }}" id="period-form">
           <input type="hidden" name="view" value="{{ view }}">
-          <label for="month">{{ t('month') }}</label>
-          <select name="month" id="month" onchange="this.form.submit()">
-            <option value="all" {% if month == 'all' or not month %}selected{% endif %}>{{ t('all_months') }}</option>
-            {% for m in months %}
-              <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}</option>
-            {% endfor %}
-          </select>
+          <div class="period-month">
+            <label for="month">{{ t('month') }}</label>
+            <select name="month" id="month">
+              <option value="all" {% if not using_range and (month == 'all' or not month) %}selected{% endif %}>{{ t('all_months') }}</option>
+              {% for m in months %}
+                <option value="{{ m }}" {% if not using_range and m == month %}selected{% endif %}>{{ m }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="period-range">
+            <label for="date_from">{{ t('date_from') }}</label>
+            <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+            <label for="date_to">{{ t('date_to') }}</label>
+            <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+            <button type="submit" class="btn ghost" id="btn-apply-range">{{ t('apply_range') }}</button>
+          </div>
         </form>
       </div>
       <div class="topbar-actions">
@@ -108,8 +117,8 @@
       {% if months %}
         <div class="empty-state">
           <p>
-            {% if view == 'income' %}{{ t('no_income') }}
-            {% elif view == 'expenses' %}{{ t('no_expenses') }}
+            {% if view == 'income' %}{{ t('no_income_range') if using_range else t('no_income') }}
+            {% elif view == 'expenses' %}{{ t('no_expenses_range') if using_range else t('no_expenses') }}
             {% else %}{{ t('no_data') }}{% endif %}
           </p>
         </div>

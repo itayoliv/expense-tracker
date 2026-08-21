@@ -141,6 +141,38 @@ def test_all_months_shows_every_expense(client):
     assert 'id="empty-import-dropzone"' not in html
 
 
+def test_date_range_filters_transactions(client):
+    client.post(
+        "/transactions",
+        json={
+            "description": "InRange",
+            "amount": 10,
+            "direction": "debit",
+            "date": "2026-08-10",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "OutOfRange",
+            "amount": 20,
+            "direction": "debit",
+            "date": "2026-09-05",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    html = client.get(
+        "/?view=expenses&date_from=2026-08-01&date_to=2026-08-31"
+    ).get_data(as_text=True)
+    assert "InRange" in html
+    assert "OutOfRange" not in html
+    assert 'id="date_from"' in html
+    assert 'value="2026-08-01"' in html
+    assert 'value="2026-08-31"' in html
+
+
 def test_import_accepts_multiple_files(client):
     from io import BytesIO
 
