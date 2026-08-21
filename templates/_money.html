@@ -1,0 +1,6 @@
+{% macro money(amount) -%}
+<span class="money">
+  <span class="money-num">{{ '{:,.2f}'.format(amount) }}</span>
+  <span class="money-sym">{{ t('currency') }}</span>
+</span>
+{%- endmacro %}

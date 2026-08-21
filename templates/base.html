@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t('app_title') }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body class="lang-{{ lang }}">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap" id="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block body %}{% endblock %}
+
+  <script>
+    window.APP = {
+      lang: {{ lang|tojson }},
+      view: {{ view|tojson }},
+      month: {{ month|tojson }},
+      categories: {{ categories|tojson }},
+      rules: {{ rules|tojson }},
+      pie: {{ summary.pie|tojson }},
+      strings: {
+        choose_category: {{ t('choose_category')|tojson }},
+        save: {{ t('save')|tojson }},
+        cancel: {{ t('cancel')|tojson }},
+        remember_rule: {{ t('remember_rule')|tojson }},
+        apply_to_categorized: {{ t('apply_to_categorized')|tojson }},
+        split_transaction: {{ t('split_transaction')|tojson }},
+        split_unsplit: {{ t('split_unsplit')|tojson }},
+        split_add_part: {{ t('split_add_part')|tojson }},
+        split_remove_part: {{ t('split_remove_part')|tojson }},
+        split_remaining: {{ t('split_remaining')|tojson }},
+        split_hint: {{ t('split_hint')|tojson }},
+        unsorted: {{ t('unsorted')|tojson }},
+        description: {{ t('description')|tojson }},
+        category: {{ t('category')|tojson }},
+        amount: {{ t('amount')|tojson }},
+        currency: {{ t('currency')|tojson }},
+        confirm_delete: {{ t('confirm_delete')|tojson }},
+        confirm_delete_category: {{ t('confirm_delete_category')|tojson }},
+        importing: {{ t('importing')|tojson }},
+        import_file: {{ t('import_file')|tojson }},
+        import_invalid_type: {{ t('import_invalid_type')|tojson }},
+        files_selected: {{ t('files_selected')|tojson }},
+        add_category: {{ t('add_category')|tojson }},
+        edit_category: {{ t('edit_category')|tojson }},
+        edit: {{ t('edit')|tojson }},
+        delete: {{ t('delete')|tojson }},
+        kind_expense: {{ t('kind_expense')|tojson }},
+        kind_income: {{ t('kind_income')|tojson }},
+        no_categories: {{ t('no_categories')|tojson }},
+        no_rules: {{ t('no_rules')|tojson }},
+        add_rule: {{ t('add_rule')|tojson }},
+        edit_rule: {{ t('edit_rule')|tojson }},
+        confirm_delete_rule: {{ t('confirm_delete_rule')|tojson }},
+        seed_categories: {{ t('seed_categories')|tojson }},
+        seed_categories_none: {{ t('seed_categories_none')|tojson }},
+        clear_transactions_confirm: {{ t('clear_transactions_confirm')|tojson }},
+        reset_rules_confirm: {{ t('reset_rules_confirm')|tojson }},
+        gpt_sorting: {{ t('gpt_sorting')|tojson }},
+        gpt_sort: {{ t('gpt_sort')|tojson }},
+        openai_key_saved: {{ t('openai_key_saved')|tojson }},
+        openai_key_cleared: {{ t('openai_key_cleared')|tojson }}
+      }
+    };
+  </script>
+  <script defer src="{{ url_for('static', filename='js/core.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/pie.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/import.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/transactions.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/categories.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/rules.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/settings.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+data/*.db
+data/*.db-journal
+data/openai_key.txt
+.DS_Store
+*.egg-info/
+.env
+*.log
+files/
+.pytest_cache/

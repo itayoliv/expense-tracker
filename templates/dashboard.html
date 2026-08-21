@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+{% from "_money.html" import money with context %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">{{ t('app_title') }}</div>
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">{{ t('nav_snapshot') }}</div>
+        <a class="nav-link {% if view == 'expenses' %}active{% endif %}"
+           href="{{ url_for('pages.dashboard', view='expenses', month=month) }}">{{ t('expenses') }}</a>
+        <a class="nav-link {% if view == 'income' %}active{% endif %}"
+           href="{{ url_for('pages.dashboard', view='income', month=month) }}">{{ t('income') }}</a>
+        <a class="nav-link {% if view == 'bottom' %}active{% endif %}"
+           href="{{ url_for('pages.dashboard', view='bottom', month=month) }}">{{ t('bottom_line') }}</a>
+      </div>
+      <div class="nav-section">
+        <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
+      </div>
+      <div class="nav-section muted">
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('arrange') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('planning') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('broad_view') }}</span>
+      </div>
+    </nav>
+    <div class="lang-switch">
+      <span class="lang-label">{{ t('language') }}</span>
+      <div class="lang-btns">
+        <a class="lang-btn {% if lang == 'en' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='en', next=url_for('pages.dashboard', view=view, month=month)) }}">EN</a>
+        <a class="lang-btn {% if lang == 'he' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='he', next=url_for('pages.dashboard', view=view, month=month)) }}">עב</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>
+          {% if view == 'expenses' %}{{ t('expenses') }}
+          {% elif view == 'income' %}{{ t('income') }}
+          {% else %}{{ t('bottom_line') }}{% endif %}
+        </h1>
+        <form class="month-form" method="get" action="{{ url_for('pages.dashboard') }}">
+          <input type="hidden" name="view" value="{{ view }}">
+          <label for="month">{{ t('month') }}</label>
+          <select name="month" id="month" onchange="this.form.submit()">
+            <option value="all" {% if month == 'all' or not month %}selected{% endif %}>{{ t('all_months') }}</option>
+            {% for m in months %}
+              <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn ghost" id="btn-open-all">{{ t('open_all') }}</button>
+        <button type="button" class="btn ghost" id="btn-close-all">{{ t('close_all') }}</button>
+        <button type="button" class="btn primary" id="btn-add">
+          <span class="plus">+</span>
+          {% if view == 'income' %}{{ t('add_income') }}{% else %}{{ t('add_expense') }}{% endif %}
+        </button>
+        <button type="button" class="btn secondary" id="btn-import">{{ t('import_file') }}</button>
+      </div>
+    </header>
+
+    {% if summary.unsorted_count and view == 'expenses' %}
+    <div class="unsorted-banner" id="unsorted-banner">
+      <div class="unsorted-header">
+        <div class="unsorted-text">
+          {% if summary.unsorted_count == 1 %}
+            {{ t('waiting_sorting_one') }}
+          {% else %}
+            {{ t('waiting_sorting', n=summary.unsorted_count) }}
+          {% endif %}
+        </div>
+        <button type="button" class="btn primary" id="btn-gpt-sort">{{ t('gpt_sort') }}</button>
+      </div>
+      <input type="search" id="unsorted-search" class="unsorted-search" placeholder="{{ t('search_unsorted') }}" autocomplete="off">
+      <div class="unsorted-list">
+        {% for u in summary.unsorted %}
+        <div class="unsorted-item" data-id="{{ u.id }}" data-date="{{ u.date }}" data-desc="{{ u.description }}" data-details="{{ u.details or '' }}" data-amount="{{ '%.2f'|format(u.amount) }}">
+          <div class="u-meta">
+            <span class="u-date">{{ u.date }}</span>
+            <span class="u-desc">{{ u.description }}</span>
+            {% if u.details %}<span class="u-details">{{ u.details }}</span>{% endif %}
+            <span class="u-source">
+              <span class="source-badge source-{{ u.source }}">{{ u.source_label }}</span>
+              {% if u.account and u.account != '—' %}<span class="u-account">{{ u.account }}</span>{% endif %}
+            </span>
+          </div>
+          <span class="u-amt">{{ money(u.amount) }}</span>
+          <select class="u-cat-select" data-txn-id="{{ u.id }}">
+            <option value="">{{ t('choose_category') }}</option>
+            {% for c in categories if c.kind == 'expense' %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not summary.categories %}
+      {% if months %}
+        <div class="empty-state">
+          <p>
+            {% if view == 'income' %}{{ t('no_income') }}
+            {% elif view == 'expenses' %}{{ t('no_expenses') }}
+            {% else %}{{ t('no_data') }}{% endif %}
+          </p>
+        </div>
+      {% else %}
+      <div class="empty-import">
+        <form method="post" action="{{ url_for('pages.import_statement') }}" enctype="multipart/form-data" class="import-panel" id="empty-import-form">
+          <h3>{{ t('upload_statement') }}</h3>
+          {% with prefix='empty-import' %}
+            {% include "_import_dropzone.html" %}
+          {% endwith %}
+          <div class="modal-actions">
+            <div class="spacer"></div>
+            <button type="submit" class="btn primary" id="empty-import-submit">{{ t('import_file') }}</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+    {% else %}
+    <div class="content-grid{% if not show_pie %} no-chart{% endif %}">
+      {% if show_pie or view == 'bottom' %}
+      <section class="chart-panel">
+        {% if show_pie %}
+        <h2 class="panel-title">
+          {% if view == 'expenses' %}{{ t('pie_title_expenses') }}
+          {% elif view == 'income' %}{{ t('pie_title_income') }}
+          {% else %}{{ t('pie_title_bottom') }}{% endif %}
+        </h2>
+        <div class="chart-wrap">
+          <canvas id="pie-chart"></canvas>
+        </div>
+        {% elif view == 'bottom' %}
+        <h2 class="panel-title">{{ t('bottom_line') }}</h2>
+        {% endif %}
+        {% if view == 'bottom' %}
+        <div class="bottom-stats">
+          <div class="stat">
+            <span class="stat-label">{{ t('total_income') }}</span>
+            <span class="stat-value income">{{ money(summary.income_total) }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">{{ t('total_expenses') }}</span>
+            <span class="stat-value expense">{{ money(summary.expense_total) }}</span>
+          </div>
+          <div class="stat highlight">
+            <span class="stat-label">{{ t('net_total') }}</span>
+            <span class="stat-value {% if summary.net >= 0 %}income{% else %}expense{% endif %}">
+              {{ money(summary.net) }}
+            </span>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      <section class="table-panel">
+        <table class="expense-table" id="expense-table">
+          <thead>
+            <tr>
+              <th class="col-cat">{{ t('category') }}</th>
+              <th class="col-total">{{ t('total_in_category') }}</th>
+              <th class="col-pct">
+                {% if view == 'income' %}{{ t('pct_of_income') }}{% else %}{{ t('pct_of_expenses') }}{% endif %}
+              </th>
+              <th class="col-toggle"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in summary.categories %}
+            <tr class="cat-row" data-cat="{{ cat.key }}">
+              <td class="col-cat">
+                <button type="button" class="cat-toggle" aria-expanded="false">
+                  <span class="chevron">▸</span>
+                  <span class="cat-icon" style="background:{{ cat.color }}"></span>
+                  <span class="cat-name">{{ cat.name }}</span>
+                </button>
+              </td>
+              <td class="col-total">{{ money(cat.total) }}</td>
+              <td class="col-pct">{{ '%.2f'|format(cat.pct) }}%</td>
+              <td class="col-toggle"></td>
+            </tr>
+            <tr class="detail-row hidden" data-cat-detail="{{ cat.key }}">
+              <td colspan="4">
+                <table class="txn-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t('what_was_expense') if view != 'income' else t('what_was_income') }}</th>
+                      <th>{{ t('date') }}</th>
+                      <th>{{ t('source') }}</th>
+                      <th class="col-amt">{{ t('amount') }}</th>
+                      <th class="col-edit"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for tx in cat.txns %}
+                    <tr data-txn-id="{{ tx.id }}"
+                        {% if tx.split_group %}
+                        class="txn-split-part"
+                        data-split-group="{{ tx.split_group }}"
+                        style="--split-accent: {{ tx.split_accent }}"
+                        {% endif %}>
+                      <td>
+                        <div class="tx-desc">
+                          {{ tx.description }}
+                          {% if tx.split_group %}
+                            <span class="split-badge">{{ t('split_badge') }}</span>
+                          {% endif %}
+                          {% if tx.categorized_by == 'gpt' %}
+                            <span class="gpt-badge">{{ t('gpt_tag') }}</span>
+                          {% endif %}
+                        </div>
+                        {% if tx.details %}<div class="tx-details">{{ tx.details }}</div>{% endif %}
+                      </td>
+                      <td>{{ tx.date }}</td>
+                      <td>
+                        <div class="tx-source">
+                          <span class="source-badge source-{{ tx.source }}">{{ tx.source_label }}</span>
+                          {% if tx.account and tx.account != '—' %}
+                            <div class="tx-account">{{ tx.account }}</div>
+                          {% endif %}
+                        </div>
+                      </td>
+                      <td class="tx-amt">{{ money(tx.amount) }}</td>
+                      <td class="col-edit">
+                        <button type="button" class="icon-btn btn-edit" title="{{ t('edit') }}" data-txn='{{ {
+                          "id": tx.id,
+                          "description": tx.description,
+                          "details": tx.details,
+                          "date": tx.date,
+                          "amount": tx.amount,
+                          "category_id": tx.category_id,
+                          "direction": tx.direction
+                        }|tojson }}'>✎</button>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td>
+                {% if view == 'expenses' %}{{ t('total_expenses') }}
+                {% elif view == 'income' %}{{ t('total_income') }}
+                {% else %}{{ t('net_total') }}{% endif %}
+              </td>
+              <td class="col-total">
+                {% if view == 'bottom' %}
+                  {{ money(summary.net) }}
+                {% else %}
+                  {{ money(summary.grand_total) }}
+                {% endif %}
+              </td>
+              <td class="col-pct">{% if view != 'bottom' %}100%{% endif %}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+    </div>
+    {% endif %}
+  </main>
+</div>
+
+<!-- Import modal -->
+<dialog id="import-modal" class="modal">
+  <form method="post" action="{{ url_for('pages.import_statement') }}" enctype="multipart/form-data" class="modal-form" id="import-form">
+    <h3>{{ t('upload_statement') }}</h3>
+    {% with prefix='import' %}
+      {% include "_import_dropzone.html" %}
+    {% endwith %}
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>{{ t('cancel') }}</button>
+      <button type="submit" class="btn primary" id="import-submit">{{ t('import_file') }}</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Manage categories modal -->
+<dialog id="categories-modal" class="modal modal-wide">
+  <div class="modal-form categories-manager">
+    <div id="category-list-panel">
+      <div class="categories-header">
+        <h3>{{ t('categories_title') }}</h3>
+        <button type="button" class="btn primary" id="btn-add-category">{{ t('add_category') }}</button>
+      </div>
+      <div id="categories-list" class="categories-list">
+        {% if not categories %}
+          <div class="categories-empty">{{ t('no_categories') }}</div>
+        {% else %}
+          {% for c in categories %}
+          <div class="cat-manage-row" data-id="{{ c.id }}">
+            <span class="cat-manage-swatch" style="background:{{ c.color }}"></span>
+            <div class="cat-manage-meta">
+              <span class="cat-manage-name">{{ c.name }}</span>
+              <span class="cat-manage-kind">{% if c.kind == 'income' %}{{ t('kind_income') }}{% else %}{{ t('kind_expense') }}{% endif %}</span>
+            </div>
+            <div class="cat-manage-actions">
+              <button type="button" class="btn ghost btn-cat-edit" data-id="{{ c.id }}">{{ t('edit') }}</button>
+              <button type="button" class="btn ghost danger btn-cat-delete" data-id="{{ c.id }}">{{ t('delete') }}</button>
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>
+      </div>
+    </div>
+
+    <form id="category-form" class="category-form-panel hidden">
+      <h3 id="category-modal-title">{{ t('add_category') }}</h3>
+      <input type="hidden" id="cat-id">
+      <label>
+        {{ t('name_en') }}
+        <input type="text" id="cat-name-en" required>
+      </label>
+      <label>
+        {{ t('name_he') }}
+        <input type="text" id="cat-name-he" required>
+      </label>
+      <label>
+        {{ t('kind') }}
+        <select id="cat-kind">
+          <option value="expense">{{ t('kind_expense') }}</option>
+          <option value="income">{{ t('kind_income') }}</option>
+        </select>
+      </label>
+      <label class="color-field">
+        {{ t('color') }}
+        <div class="color-row">
+          <input type="color" id="cat-color" value="#6B7280">
+          <input type="text" id="cat-color-hex" value="#6B7280" maxlength="7" pattern="#[0-9A-Fa-f]{6}">
+        </div>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="btn-cat-form-cancel">{{ t('cancel') }}</button>
+        <button type="submit" class="btn primary">{{ t('save') }}</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Manage rules modal -->
+<dialog id="rules-modal" class="modal modal-wide">
+  <div class="modal-form rules-manager">
+    <div id="rule-list-panel">
+      <div class="categories-header">
+        <h3>{{ t('rules_title') }}</h3>
+        <button type="button" class="btn primary" id="btn-add-rule">{{ t('add_rule') }}</button>
+      </div>
+      <input type="search" id="rules-search" placeholder="{{ t('search_rules') }}" autocomplete="off">
+      <div id="rules-list" class="categories-list">
+        {% if not rules %}
+          <div class="categories-empty">{{ t('no_rules') }}</div>
+        {% else %}
+          {% for r in rules %}
+          <div class="cat-manage-row" data-id="{{ r.id }}">
+            <span class="cat-manage-swatch" style="background:{{ r.category_color }}"></span>
+            <div class="cat-manage-meta">
+              <span class="cat-manage-name">{{ r.display_name }}</span>
+              <span class="cat-manage-kind">{{ r.category_name }}{% if r.pattern != r.display_name %} · {{ r.pattern }}{% endif %}</span>
+            </div>
+            <div class="cat-manage-actions">
+              <button type="button" class="btn ghost btn-rule-edit" data-id="{{ r.id }}">{{ t('edit') }}</button>
+              <button type="button" class="btn ghost danger btn-rule-delete" data-id="{{ r.id }}">{{ t('delete') }}</button>
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>
+      </div>
+    </div>
+
+    <form id="rule-form" class="category-form-panel hidden">
+      <h3 id="rule-modal-title">{{ t('add_rule') }}</h3>
+      <input type="hidden" id="rule-id">
+      <label>
+        {{ t('rule_name') }}
+        <input type="text" id="rule-name" maxlength="128">
+        <span class="field-hint">{{ t('rule_name_hint') }}</span>
+      </label>
+      <label>
+        {{ t('pattern') }}
+        <input type="text" id="rule-pattern" required maxlength="256">
+        <span class="field-hint">{{ t('pattern_hint') }}</span>
+      </label>
+      <label>
+        {{ t('category') }}
+        <select id="rule-category" required>
+          <option value="">{{ t('choose_category') }}</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        {{ t('priority') }}
+        <input type="number" id="rule-priority" value="100" step="1">
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="btn-rule-form-cancel">{{ t('cancel') }}</button>
+        <button type="submit" class="btn primary">{{ t('save') }}</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Settings modal -->
+<dialog id="settings-modal" class="modal">
+  <div class="modal-form">
+    <h3>{{ t('settings_title') }}</h3>
+    <div class="settings-block">
+      <label class="checkbox">
+        <input type="checkbox" id="setting-show-pie" {% if show_pie %}checked{% endif %}>
+        {{ t('show_pie_chart') }}
+      </label>
+      <p class="settings-hint">{{ t('show_pie_chart_hint') }}</p>
+    </div>
+    <div class="settings-block">
+      <label>
+        {{ t('openai_key') }}
+        <input type="password" id="openai-key" autocomplete="off" placeholder="{{ t('openai_key_placeholder') }}">
+      </label>
+      <p class="settings-hint">{{ t('openai_key_hint') }}</p>
+      <p class="settings-hint" id="openai-key-status">
+        {% if openai_key_set %}{{ t('openai_key_set') }}{% else %}{{ t('openai_key_missing') }}{% endif %}
+      </p>
+      <div class="settings-key-actions">
+        <button type="button" class="btn primary" id="btn-save-openai-key">{{ t('save_api_key') }}</button>
+        <button type="button" class="btn ghost" id="btn-clear-openai-key">{{ t('clear_api_key') }}</button>
+      </div>
+    </div>
+    <div class="settings-block">
+      <p class="settings-hint">{{ t('seed_categories_hint') }}</p>
+      <button type="button" class="btn primary" id="btn-seed-categories">{{ t('seed_categories') }}</button>
+    </div>
+    <div class="settings-block">
+      <p class="settings-hint">{{ t('reset_rules_hint') }}</p>
+      <button type="button" class="btn danger" id="btn-reset-rules">{{ t('reset_rules') }}</button>
+    </div>
+    <div class="settings-block settings-danger">
+      <p class="settings-hint">{{ t('clear_transactions_hint') }}</p>
+      <button type="button" class="btn danger" id="btn-clear-transactions">{{ t('clear_transactions') }}</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Add / Edit modal -->
+<dialog id="txn-modal" class="modal">
+  <form id="txn-form" class="modal-form">
+    <h3 id="txn-modal-title">{{ t('add_expense') }}</h3>
+    <input type="hidden" name="id" id="txn-id">
+    <input type="hidden" name="direction" id="txn-direction" value="{{ 'credit' if view == 'income' else 'debit' }}">
+    <div id="txn-single-fields">
+      <label>
+        {{ t('description') }}
+        <input type="text" name="description" id="txn-description" required>
+      </label>
+      <label>
+        {{ t('details') }}
+        <input type="text" name="details" id="txn-details">
+      </label>
+      <label>
+        {{ t('date') }}
+        <input type="date" name="date" id="txn-date" required>
+      </label>
+      <label>
+        {{ t('amount') }}
+        <input type="number" name="amount" id="txn-amount" min="0.01" step="0.01" required>
+      </label>
+      <label id="txn-category-wrap">
+        {{ t('category') }}
+        <select name="category_id" id="txn-category">
+          <option value="">{{ t('unsorted') }}</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" data-kind="{{ c.kind }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div id="txn-split-panel" class="txn-split-panel hidden">
+      <p class="txn-split-hint">{{ t('split_hint') }}</p>
+      <label>
+        {{ t('date') }}
+        <input type="date" id="txn-split-date" required>
+      </label>
+      <div class="txn-split-meta">
+        <span>{{ t('amount') }}: <strong id="txn-split-total">0</strong></span>
+        <span id="txn-split-remaining" class="txn-split-remaining"></span>
+      </div>
+      <div id="txn-split-rows" class="txn-split-rows"></div>
+      <button type="button" class="btn ghost" id="btn-split-add">{{ t('split_add_part') }}</button>
+    </div>
+    <label class="checkbox remember-wrap hidden" id="remember-wrap">
+      <input type="checkbox" name="remember_rule" id="txn-remember">
+      {{ t('remember_rule') }}
+    </label>
+    <label class="checkbox remember-wrap hidden" id="apply-categorized-wrap">
+      <input type="checkbox" name="apply_to_categorized" id="txn-apply-categorized">
+      {{ t('apply_to_categorized') }}
+    </label>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost danger hidden" id="btn-delete">{{ t('delete') }}</button>
+      <button type="button" class="btn ghost hidden" id="btn-split-toggle">{{ t('split_transaction') }}</button>
+      <div class="spacer"></div>
+      <button type="button" class="btn ghost" data-close>{{ t('cancel') }}</button>
+      <button type="submit" class="btn primary">{{ t('save') }}</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
