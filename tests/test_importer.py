@@ -250,10 +250,10 @@ def test_dashboard_month_uses_billing_date(client):
     with db.get_session() as session:
         import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
 
-    html = client.get("/?month=2026-09&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-09-01&view=expenses").get_data(as_text=True)
     assert "דינמיקה רננים" in html
     assert "סמארטאייר תל אביב בע" in html
     assert "APPLE.COM/BILL" in html
 
-    july = client.get("/?month=2026-07&view=expenses").get_data(as_text=True)
+    july = client.get("/?date_from=2026-07-01&view=expenses").get_data(as_text=True)
     assert "דינמיקה רננים" not in july

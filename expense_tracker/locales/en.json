@@ -97,6 +97,7 @@
   "cancel": "Cancel",
   "remember_rule": "Remember this categorization",
   "apply_to_categorized": "Also update already categorized with the same name",
+  "unsorted_update": "Update",
   "split_transaction": "Split transaction",
   "split_hint": "Break this line into parts with different descriptions. Each part stays in the parent category unless you change it. Amounts must add up to the total.",
   "split_add_part": "Add part",

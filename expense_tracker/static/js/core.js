@@ -79,16 +79,4 @@
     });
   }
 
-  // Period filter: month clears dates; applying dates keeps the selected month ignored server-side
-  const periodForm = document.getElementById("period-form");
-  const monthSelect = document.getElementById("month");
-  const dateFrom = document.getElementById("date_from");
-  const dateTo = document.getElementById("date_to");
-  if (periodForm && monthSelect) {
-    monthSelect.addEventListener("change", () => {
-      if (dateFrom) dateFrom.value = "";
-      if (dateTo) dateTo.value = "";
-      periodForm.submit();
-    });
-  }
 })();

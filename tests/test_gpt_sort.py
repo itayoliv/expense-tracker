@@ -187,14 +187,14 @@ def test_manual_patch_clears_gpt_tag(client, monkeypatch):
 
 def test_dashboard_shows_gpt_badge_and_sort_button(client, monkeypatch):
     _add_txn(client, "ZARA", 80, "debit", "2026-08-02")
-    html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
     assert 'id="btn-gpt-sort"' in html
     monkeypatch.setattr(
         "expense_tracker.gpt_sort.ask_openai", lambda *_a, **_k: {"Shopping": ["ZARA"]}
     )
     monkeypatch.setattr("expense_tracker.gpt_sort.get_api_key", lambda: "sk-test")
     assert client.post("/api/gpt/sort").status_code == 200
-    html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
     assert 'class="gpt-badge"' in html
     txn_js = client.get("/static/js/transactions.js").get_data(as_text=True)
     settings_js = client.get("/static/js/settings.js").get_data(as_text=True)

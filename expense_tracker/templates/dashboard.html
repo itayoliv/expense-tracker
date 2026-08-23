@@ -47,15 +47,6 @@
         </h1>
         <form class="period-form" method="get" action="{{ url_for('pages.dashboard') }}" id="period-form">
           <input type="hidden" name="view" value="{{ view }}">
-          <div class="period-month">
-            <label for="month">{{ t('month') }}</label>
-            <select name="month" id="month">
-              <option value="all" {% if not using_range and (month == 'all' or not month) %}selected{% endif %}>{{ t('all_months') }}</option>
-              {% for m in months %}
-                <option value="{{ m }}" {% if not using_range and m == month %}selected{% endif %}>{{ m }}</option>
-              {% endfor %}
-            </select>
-          </div>
           <div class="period-range">
             <label for="date_from">{{ t('date_from') }}</label>
             <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
@@ -102,12 +93,25 @@
             </span>
           </div>
           <span class="u-amt">{{ money(u.amount) }}</span>
-          <select class="u-cat-select" data-txn-id="{{ u.id }}">
-            <option value="">{{ t('choose_category') }}</option>
-            {% for c in categories if c.kind == 'expense' %}
-              <option value="{{ c.id }}">{{ c.name }}</option>
-            {% endfor %}
-          </select>
+          <div class="u-cat-actions">
+            <select class="u-cat-select" data-txn-id="{{ u.id }}">
+              <option value="">{{ t('choose_category') }}</option>
+              {% for c in categories if c.kind == 'expense' %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="u-cat-checks">
+              <label class="checkbox u-remember-wrap">
+                <input type="checkbox" class="u-remember" checked>
+                {{ t('remember_rule') }}
+              </label>
+              <label class="checkbox u-apply-wrap">
+                <input type="checkbox" class="u-apply-categorized">
+                {{ t('apply_to_categorized') }}
+              </label>
+            </div>
+            <button type="button" class="btn primary u-update-btn" hidden>{{ t('unsorted_update') }}</button>
+          </div>
         </div>
         {% endfor %}
       </div>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import calendar
 from datetime import date
 from typing import Any
 
@@ -38,6 +39,30 @@ def parse_iso_date(raw: str | None) -> date | None:
 def current_month_key() -> str:
     today = date.today()
     return f"{today.year:04d}-{today.month:02d}"
+
+
+def first_day_of_month(when: date | None = None) -> date:
+    today = when or date.today()
+    return date(today.year, today.month, 1)
+
+
+def last_day_of_month(when: date) -> date:
+    last = calendar.monthrange(when.year, when.month)[1]
+    return date(when.year, when.month, last)
+
+
+def resolve_date_range(
+    date_from: date | None, date_to: date | None
+) -> tuple[date | None, date | None]:
+    """Open-ended to-date means through the end of the from-date month."""
+    if not date_from and not date_to:
+        return None, None
+    start, end = date_from, date_to
+    if start and end and start > end:
+        start, end = end, start
+    if start and not end:
+        end = last_day_of_month(start)
+    return start, end
 
 
 def billing_date_expr():
@@ -162,17 +187,15 @@ def is_bank_card_lump(txn) -> bool:
 def build_summary(
     session,
     view: str,
-    month: tuple[int, int] | None,
     lang: str,
     *,
     date_from: date | None = None,
     date_to: date | None = None,
 ) -> dict:
     base = select(Transaction).options(joinedload(Transaction.category))
-    if date_from or date_to:
-        base = date_range_filter(base, date_from, date_to)
-    else:
-        base = month_filter(base, month)
+    start, end = resolve_date_range(date_from, date_to)
+    if start or end:
+        base = date_range_filter(base, start, end)
     txns = list(session.scalars(base).unique().all())
 
     # Avoid double-counting: when card merchant details exist, hide bank card lumps

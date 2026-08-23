@@ -58,9 +58,9 @@ def test_income_view_without_credits_does_not_look_unimported(client):
         headers={"X-Requested-With": "XMLHttpRequest"},
     )
     assert created.status_code == 200
-    html = client.get("/?view=income&month=2026-08").get_data(as_text=True)
+    html = client.get("/?view=income&date_from=2026-08-01").get_data(as_text=True)
     assert 'class="empty-import"' not in html
-    assert "No income in this month." in html
+    assert "No income in this date range." in html
     assert "Coffee" not in html
 
 
@@ -98,9 +98,9 @@ def test_dashboard_defaults_to_current_month(client):
     html = client.get("/").get_data(as_text=True)
     assert "ThisMonth" in html
     assert "OtherMonth" not in html
-    current_key = f"{today.year:04d}-{today.month:02d}"
-    assert f'value="{current_key}"' in html
-    assert "selected" in html
+    first = f"{today.year:04d}-{today.month:02d}-01"
+    assert f'value="{first}"' in html
+    assert 'id="month"' not in html
 
 
 def test_all_months_shows_every_expense(client):
@@ -134,10 +134,9 @@ def test_all_months_shows_every_expense(client):
         headers={"X-Requested-With": "XMLHttpRequest"},
     )
 
-    html = client.get("/?month=all").get_data(as_text=True)
+    html = client.get("/?date_from=&date_to=").get_data(as_text=True)
     assert "ThisMonth" in html
     assert "OtherMonth" in html
-    assert 'value="all"' in html
     assert 'id="empty-import-dropzone"' not in html
 
 
@@ -173,6 +172,46 @@ def test_date_range_filters_transactions(client):
     assert 'value="2026-08-31"' in html
 
 
+def test_open_date_to_includes_whole_month(client):
+    client.post(
+        "/transactions",
+        json={
+            "description": "Early",
+            "amount": 10,
+            "direction": "debit",
+            "date": "2026-08-01",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "Late",
+            "amount": 20,
+            "direction": "debit",
+            "date": "2026-08-31",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "NextMonth",
+            "amount": 30,
+            "direction": "debit",
+            "date": "2026-09-01",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    html = client.get("/?view=expenses&date_from=2026-08-01").get_data(as_text=True)
+    assert "Early" in html
+    assert "Late" in html
+    assert "NextMonth" not in html
+    assert 'value="2026-08-01"' in html
+    assert 'value=""' in html or 'value="2026-08-31"' not in html.split('id="date_to"')[1][:80]
+
+
 def test_import_accepts_multiple_files(client):
     from io import BytesIO
 
@@ -199,7 +238,7 @@ def test_import_accepts_multiple_files(client):
     with db.get_session() as session:
         count = session.scalar(select(func.count()).select_from(Transaction))
     assert count == 3
-    html = client.get("/?month=all").get_data(as_text=True)
+    html = client.get("/?date_from=&date_to=").get_data(as_text=True)
     assert "דינמיקה רננים" in html
 
 
@@ -229,9 +268,14 @@ def test_unsorted_banner_shows_details_newest_first(client):
         },
         headers=hdr,
     )
-    html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
     assert 'id="unsorted-banner"' in html
     assert 'id="unsorted-search"' in html
+    assert 'class="u-remember"' in html
+    assert 'class="u-apply-categorized"' in html
+    assert "u-update-btn" in html
+    assert "Remember this categorization" in html or "זכור את הסיווג הזה" in html
+    assert "Update" in html or "עדכון" in html
     assert html.find("NewShop") < html.find("OldShop")
     assert "15/08/26" in html
     assert "01/08/26" in html
@@ -264,7 +308,7 @@ def test_dashboard_shows_source_badges(client):
         import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
         import_file(session, _bank_csv_bytes(), "hapoalim.csv")
 
-    expenses = client.get("/?month=all&view=expenses").get_data(as_text=True)
+    expenses = client.get("/?date_from=&date_to=&view=expenses").get_data(as_text=True)
     assert 'source-badge source-manual' in expenses
     assert "Manual" in expenses
     assert 'source-badge source-card' in expenses
@@ -290,6 +334,6 @@ def test_unsorted_search_placeholder_is_hebrew(client):
         headers=hdr,
     )
     client.set_cookie("lang", "he")
-    html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
     assert "חיפוש לפי תאריך, תיאור או סכום" in html
     assert "Search by date, description, or amount" not in html

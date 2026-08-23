@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from sqlalchemy import select
 from werkzeug.utils import secure_filename
@@ -17,6 +19,7 @@ from expense_tracker.services.summary import (
     available_months,
     build_summary,
     current_month_key,
+    first_day_of_month,
     parse_iso_date,
     parse_month,
 )
@@ -41,46 +44,48 @@ def _allowed_upload(storage) -> bool:
     return _upload_ext(original) in ALLOWED_EXT
 
 
+def _dashboard_dates() -> tuple[date | None, date | None, bool]:
+    """Return raw from/to dates and whether the user chose an explicit range."""
+    has_date_args = "date_from" in request.args or "date_to" in request.args
+    if has_date_args:
+        return parse_iso_date(request.args.get("date_from")), parse_iso_date(
+            request.args.get("date_to")
+        ), True
+
+    month_raw = (request.args.get("month") or "").strip()
+    if month_raw:
+        if month_raw == "all":
+            return None, None, True
+        parsed = parse_month(month_raw)
+        if parsed:
+            y, m = parsed
+            return date(y, m, 1), None, True
+        return first_day_of_month(), None, False
+
+    return first_day_of_month(), None, False
+
+
 @bp.route("/")
 def dashboard():
     current_lang = lang()
     current_view = view()
-    current_month = current_month_key()
 
-    date_from = parse_iso_date(request.args.get("date_from"))
-    date_to = parse_iso_date(request.args.get("date_to"))
+    date_from, date_to, explicit_range = _dashboard_dates()
     if date_from and date_to and date_from > date_to:
         date_from, date_to = date_to, date_from
-    using_range = date_from is not None or date_to is not None
+    using_range = explicit_range and (date_from is not None or date_to is not None)
     date_from_raw = date_from.isoformat() if date_from else ""
     date_to_raw = date_to.isoformat() if date_to else ""
 
     with get_session() as session:
         months = available_months(session)
+        current_month = current_month_key()
         if months and current_month not in months:
             months = sorted({*months, current_month}, reverse=True)
-
-        if using_range:
-            month_raw = "all"
-            month = None
-        elif "month" not in request.args:
-            if months:
-                month_raw = current_month
-                month = parse_month(current_month)
-            else:
-                month_raw = "all"
-                month = None
-        else:
-            month_raw = request.args.get("month") or "all"
-            month = parse_month(month_raw)
-            if month_raw != "all" and month is None:
-                month_raw = current_month if months else "all"
-                month = parse_month(month_raw)
 
         summary = build_summary(
             session,
             current_view,
-            month,
             current_lang,
             date_from=date_from,
             date_to=date_to,
@@ -91,26 +96,28 @@ def dashboard():
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
 
-    filter_period: dict[str, str] = {}
-    if using_range:
-        if date_from_raw:
-            filter_period["date_from"] = date_from_raw
-        if date_to_raw:
-            filter_period["date_to"] = date_to_raw
-    else:
-        filter_period["month"] = month_raw
+    filter_period: dict[str, str] = {"view": current_view}
+    if date_from_raw:
+        filter_period["date_from"] = date_from_raw
+    if date_to_raw:
+        filter_period["date_to"] = date_to_raw
+    if using_range and not date_from_raw and not date_to_raw:
+        filter_period["date_from"] = ""
+        filter_period["date_to"] = ""
+
+    nav_period = {k: v for k, v in filter_period.items() if k != "view"}
 
     return render_template(
         "dashboard.html",
         lang=current_lang,
         dir=html_dir(current_lang),
         view=current_view,
-        month=month_raw,
+        month="all",
         months=months,
         date_from=date_from_raw,
         date_to=date_to_raw,
         using_range=using_range,
-        filter_period=filter_period,
+        filter_period=nav_period,
         summary=summary,
         categories=cats_json,
         rules=rules_json,

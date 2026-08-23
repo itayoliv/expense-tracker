@@ -114,7 +114,7 @@ def test_dashboard_marks_split_parts(client):
             ]
         },
     )
-    html = client.get("/?month=2026-08&view=expenses").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
     assert "txn-split-part" in html
     assert "split-badge" in html or "Split" in html
     assert "--split-accent:" in html

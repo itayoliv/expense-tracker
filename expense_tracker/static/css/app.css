@@ -34,10 +34,6 @@ a { color: inherit; text-decoration: none; }
 .layout {
   display: flex;
   min-height: 100vh;
-  flex-direction: row-reverse;
-}
-
-html[dir="rtl"] .layout {
   flex-direction: row;
 }
 
@@ -137,7 +133,6 @@ html[dir="rtl"] .layout {
   color: var(--muted);
   font-size: 0.9rem;
 }
-.period-month,
 .period-range {
   display: flex;
   flex-wrap: wrap;
@@ -231,12 +226,14 @@ html[dir="rtl"] .layout {
   flex-wrap: wrap;
   gap: 0.55rem 0.75rem;
   align-items: center;
+  justify-content: flex-start;
   padding: 0.55rem 0;
   border-top: 1px solid #ffedd5;
 }
 .u-meta {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 160px;
+  max-width: min(100%, 28rem);
   display: flex;
   flex-direction: column;
   gap: 0.12rem;
@@ -259,12 +256,42 @@ html[dir="rtl"] .layout {
   flex-wrap: wrap;
 }
 .u-source .source-badge { opacity: 1; }
-.u-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+.u-amt {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-inline-start: 1.75rem;
+}
+.u-cat-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+}
 .u-cat-select {
   padding: 0.35rem 0.5rem;
   border-radius: 6px;
   border: 1px solid #fdba74;
   background: #fff;
+  max-width: 100%;
+}
+.u-cat-checks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.u-update-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.u-remember-wrap,
+.u-apply-wrap {
+  font-size: 0.78rem;
+  color: #9a3412;
+  gap: 0.35rem;
+  line-height: 1.25;
 }
 
 .empty-import {

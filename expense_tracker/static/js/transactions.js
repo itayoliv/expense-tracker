@@ -158,18 +158,51 @@
     }));
   }
 
-  // Unsorted quick categorize
-  document.querySelectorAll(".u-cat-select").forEach((sel) => {
-    sel.addEventListener("change", async () => {
+  // Unsorted quick categorize — Update appears only after a change
+  document.querySelectorAll(".unsorted-item").forEach((item) => {
+    const sel = item.querySelector(".u-cat-select");
+    const rememberBox = item.querySelector(".u-remember");
+    const applyBox = item.querySelector(".u-apply-categorized");
+    const updateBtn = item.querySelector(".u-update-btn");
+    if (!sel || !updateBtn) return;
+
+    const initial = {
+      category: sel.value || "",
+      remember: Boolean(rememberBox?.checked),
+      applyAll: Boolean(applyBox?.checked),
+    };
+
+    const syncUpdateBtn = () => {
+      const dirty =
+        (sel.value || "") !== initial.category ||
+        Boolean(rememberBox?.checked) !== initial.remember ||
+        Boolean(applyBox?.checked) !== initial.applyAll;
+      updateBtn.hidden = !dirty;
+    };
+
+    sel.addEventListener("change", syncUpdateBtn);
+    rememberBox?.addEventListener("change", syncUpdateBtn);
+    applyBox?.addEventListener("change", syncUpdateBtn);
+
+    updateBtn.addEventListener("click", async () => {
       const id = sel.dataset.txnId;
       const category_id = sel.value || null;
       if (!category_id) return;
+      updateBtn.disabled = true;
       const res = await fetch(`/transactions/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category_id, remember_rule: true }),
+        body: JSON.stringify({
+          category_id,
+          remember_rule: Boolean(rememberBox?.checked),
+          apply_to_categorized: Boolean(applyBox?.checked),
+        }),
       });
-      if (res.ok) location.reload();
+      if (res.ok) {
+        location.reload();
+        return;
+      }
+      updateBtn.disabled = false;
     });
   });
 
