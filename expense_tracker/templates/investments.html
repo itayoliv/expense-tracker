@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% from "_money.html" import money_usd_ils with context %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">{{ t('app_title') }}</div>
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">{{ t('nav_snapshot') }}</div>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='expenses') }}">{{ t('expenses') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='income') }}">{{ t('income') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='bottom') }}">{{ t('bottom_line') }}</a>
+        <a class="nav-link active" href="{{ url_for('investments.investments') }}">{{ t('investments') }}</a>
+      </div>
+      <div class="nav-section">
+        <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
+      </div>
+      <div class="nav-section muted">
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('arrange') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('planning') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('broad_view') }}</span>
+      </div>
+    </nav>
+    <div class="lang-switch">
+      <span class="lang-label">{{ t('language') }}</span>
+      <div class="lang-btns">
+        <a class="lang-btn {% if lang == 'en' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='en', next=url_for('investments.investments')) }}">EN</a>
+        <a class="lang-btn {% if lang == 'he' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='he', next=url_for('investments.investments')) }}">עב</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>{{ t('investments') }}</h1>
+        {% if updated_at %}
+          <p class="investments-updated" id="investments-updated">{{ t('last_updated') }}: {{ updated_at }}</p>
+        {% else %}
+          <p class="investments-updated" id="investments-updated" hidden></p>
+        {% endif %}
+        <p class="live-status" id="live-status" hidden></p>
+        <p class="fx-rate muted-note" id="fx-rate"
+           {% if not usd_ils %}hidden{% endif %}>
+          {% if usd_ils %}{{ t('usd_ils_rate', rate='%.4f'|format(usd_ils)) }}{% endif %}
+        </p>
+      </div>
+      <div class="topbar-actions">
+        {% if connected %}
+        <form method="post" action="{{ url_for('investments.refresh') }}">
+          <button type="submit" class="btn primary" id="btn-refresh-investments">{{ t('refresh_portfolios') }}</button>
+        </form>
+        {% endif %}
+      </div>
+    </header>
+
+    {% if not connected %}
+      <div class="empty-state">
+        <p>{{ t('yahoo_not_connected') }}</p>
+        <p class="muted-note">{{ t('yahoo_connect_hint') }}</p>
+      </div>
+    {% elif not has_cache %}
+      <div class="empty-state">
+        <p>{{ t('yahoo_no_cache') }}</p>
+        <form method="post" action="{{ url_for('investments.refresh') }}">
+          <button type="submit" class="btn primary">{{ t('refresh_portfolios') }}</button>
+        </form>
+      </div>
+    {% else %}
+    <div class="investments-stack" id="investments-live-root"
+         data-quotes-url="{{ url_for('investments.quotes') }}"
+         data-history-url="{{ url_for('investments.history') }}"
+         data-sectors-url="{{ url_for('investments.sectors') }}"
+         data-usd-ils="{{ usd_ils or 0 }}"
+         data-currency-usd="$"
+         data-currency-ils="₪"
+         data-label-live="{{ t('live_prices') }}"
+         data-label-pre="{{ t('live_premarket') }}"
+         data-label-post="{{ t('live_afterhours') }}"
+         data-label-closed="{{ t('market_closed') }}"
+         data-label-updated="{{ t('last_updated') }}"
+         data-label-holdings-value="{{ t('holdings_value') }}"
+         data-label-fx="{{ t('usd_ils_rate') }}"
+         data-label-sector-allocation="{{ t('sector_allocation') }}"
+         data-label-sector-unclassified="{{ t('sector_unclassified_title') }}"
+         data-label-sector-unclassified-hint="{{ t('sector_unclassified_hint') }}"
+         data-label-sector-no-data="{{ t('sector_no_data') }}">
+
+      <section class="chart-panel investments-chart-panel">
+        <div class="investments-chart-header">
+          <div>
+            <h2 class="panel-title" id="holdings-chart-title">{{ t('all_portfolio_holdings') }}</h2>
+            <div class="investments-chart-total" id="holdings-chart-total">{{ money_usd_ils(grand_total, usd_ils) }}</div>
+          </div>
+          <label class="portfolio-filter">
+            <span class="muted-note">{{ t('portfolio') }}</span>
+            <select id="portfolio-filter" aria-label="{{ t('portfolio') }}">
+              <option value="all" selected>{{ t('all_portfolios') }}</option>
+              {% for p in portfolios %}
+              <option value="{{ p.id }}">{{ p.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        <div class="range-tabs" id="history-range-tabs" role="tablist">
+          <button type="button" class="range-tab" data-range="1d">1D</button>
+          <button type="button" class="range-tab" data-range="5d">5D</button>
+          <button type="button" class="range-tab" data-range="1mo">1M</button>
+          <button type="button" class="range-tab active" data-range="6mo">6M</button>
+          <button type="button" class="range-tab" data-range="ytd">YTD</button>
+          <button type="button" class="range-tab" data-range="1y">1Y</button>
+        </div>
+        <div class="chart-wrap investments-chart-wrap">
+          <canvas id="holdings-history-chart"></canvas>
+        </div>
+        <p class="muted-note chart-loading" id="holdings-chart-loading" hidden>{{ t('chart_loading') }}</p>
+      </section>
+
+      <section class="chart-panel investments-sector-panel">
+        <h2 class="panel-title">{{ t('sector_allocation') }}</h2>
+        <div class="investments-sector-grid">
+          <div class="sector-chart-wrap">
+            <canvas id="sector-allocation-chart" aria-label="{{ t('sector_allocation') }}"></canvas>
+          </div>
+          <div class="sector-legend" id="sector-legend"></div>
+        </div>
+        <p class="muted-note sector-empty" id="sector-empty" hidden>{{ t('sector_no_data') }}</p>
+        <div class="sector-unclassified" id="sector-unclassified" hidden>
+          <h3 class="sector-unclassified-title">{{ t('sector_unclassified_title') }}</h3>
+          <p class="muted-note">{{ t('sector_unclassified_hint') }}</p>
+          <ul class="sector-unclassified-list" id="sector-unclassified-list"></ul>
+        </div>
+      </section>
+
+      <section class="table-panel">
+        <div class="bottom-stats investments-summary">
+          <div class="stat highlight">
+            <span class="stat-label">{{ t('total_investments') }}</span>
+            <span class="stat-value" id="investments-grand-total">{{ money_usd_ils(grand_total, usd_ils) }}</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">{{ t('portfolios_count') }}</span>
+            <span class="stat-value">{{ portfolios|length }}</span>
+          </div>
+        </div>
+
+        <table class="expense-table" id="investments-table">
+          <thead>
+            <tr>
+              <th class="col-cat">{{ t('portfolio') }}</th>
+              <th class="col-total">{{ t('market_value') }}</th>
+              <th class="col-pct">{{ t('holdings_count') }}</th>
+              <th class="col-toggle"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in portfolios %}
+            <tr class="cat-row open portfolio-block" data-cat="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
+              <td class="col-cat">
+                <button type="button" class="cat-toggle" aria-expanded="true">
+                  <span class="chevron">▸</span>
+                  <span class="cat-name">{{ p.name }}</span>
+                </button>
+              </td>
+              <td class="col-total portfolio-total" data-portfolio-total="{{ p.id }}">{{ money_usd_ils(p.total_value, usd_ils) }}</td>
+              <td class="col-pct">{{ p.holdings|length }}</td>
+              <td class="col-toggle"></td>
+            </tr>
+            <tr class="detail-row portfolio-detail" data-cat-detail="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
+              <td colspan="4">
+                {% if p.holdings %}
+                <table class="txn-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t('symbol') }}</th>
+                      <th>{{ t('holding_name') }}</th>
+                      <th class="col-amt">{{ t('shares') }}</th>
+                      <th class="col-amt">{{ t('price') }} ($)</th>
+                      <th class="col-amt">{{ t('day_change') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for h in p.holdings %}
+                    <tr class="holding-row"
+                        data-symbol="{{ h.symbol }}"
+                        data-quantity="{{ h.quantity }}"
+                        data-price="{{ h.price }}"
+                        data-portfolio-id="{{ p.id }}">
+                      <td><strong>{{ h.symbol }}</strong></td>
+                      <td class="holding-name">{{ h.name }}</td>
+                      <td class="tx-amt holding-qty">{{ '%.4f'|format(h.quantity) }}</td>
+                      <td class="tx-amt holding-price {% if h.change_pct > 0 %}chg-up{% elif h.change_pct < 0 %}chg-down{% endif %}">${{ '%.2f'|format(h.price) }}</td>
+                      <td class="tx-amt holding-chg {% if h.change_pct > 0 %}chg-up{% elif h.change_pct < 0 %}chg-down{% endif %}">
+                        {{ '%+.2f'|format(h.change_pct) }}%
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+                {% else %}
+                  <p class="muted-note">{{ t('no_holdings') }}</p>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td>{{ t('total_investments') }}</td>
+              <td class="col-total" id="investments-table-total">{{ money_usd_ils(grand_total, usd_ils) }}</td>
+              <td class="col-pct"></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+    </div>
+    {% endif %}
+  </main>
+</div>
+
+{% include "_manage_modals.html" %}
+{% endblock %}
+
+{% block scripts %}
+{% if has_cache %}
+<script defer src="{{ url_for('static', filename='js/investments.js') }}"></script>
+{% endif %}
+{% endblock %}

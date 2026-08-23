@@ -886,3 +886,206 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   flex: 1;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+/* Investments / Yahoo portfolios — stock-specific accents */
+.investments-updated {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.investments-summary {
+  margin: 0 0 1rem;
+}
+.muted-note {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.chg-up { color: #16a34a; font-weight: 600; }
+.chg-down { color: #dc2626; font-weight: 600; }
+
+.live-status {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.live-status.is-live { color: #16a34a; }
+.live-status.is-closed { color: var(--muted); font-weight: 500; }
+
+.holding-price.price-flash {
+  animation: price-flash 0.7s ease;
+}
+@keyframes price-flash {
+  0% { background: rgba(34, 197, 94, 0.22); }
+  100% { background: transparent; }
+}
+.holding-price.chg-down.price-flash {
+  animation-name: price-flash-down;
+}
+@keyframes price-flash-down {
+  0% { background: rgba(220, 38, 38, 0.22); }
+  100% { background: transparent; }
+}
+
+.investments-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.investments-chart-panel {
+  padding-bottom: 1.25rem;
+}
+.investments-chart-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+.investments-chart-total {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.money-pair {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  font-variant-numeric: tabular-nums;
+}
+.money-usd {
+  font-weight: 700;
+  flex-direction: row !important;
+}
+.money-usd .money-num {
+  min-width: 0;
+  text-align: left;
+}
+.money-ils {
+  font-size: 0.85em;
+  font-weight: 500;
+}
+.fx-rate {
+  margin: 0.2rem 0 0;
+}
+html[dir="rtl"] .money-pair {
+  align-items: flex-end;
+}
+.portfolio-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 12rem;
+}
+.portfolio-filter select {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+.range-tab {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.range-tab:hover { color: var(--text); }
+.range-tab.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.investments-chart-wrap {
+  height: 280px;
+}
+.portfolio-block.is-filtered-out,
+.portfolio-detail.is-filtered-out {
+  display: none;
+}
+
+.investments-sector-panel {
+  padding-bottom: 1rem;
+}
+.investments-sector-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 1rem 1.5rem;
+  align-items: start;
+}
+.sector-chart-wrap {
+  position: relative;
+  height: 260px;
+}
+.sector-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.sector-legend-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.sector-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.sector-legend-label {
+  min-width: 0;
+}
+.sector-legend-value,
+.sector-legend-pct {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sector-legend-pct {
+  color: var(--muted);
+  min-width: 3.25rem;
+  text-align: end;
+}
+.sector-unclassified {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.sector-unclassified-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.sector-unclassified-list {
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.2rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.sector-empty {
+  margin: 0.5rem 0 0;
+}
+@media (max-width: 760px) {
+  .investments-sector-grid {
+    grid-template-columns: 1fr;
+  }
+  .sector-chart-wrap {
+    height: 220px;
+  }
+}
+

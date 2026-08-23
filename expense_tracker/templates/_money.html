@@ -4,3 +4,19 @@
   <span class="money-sym">{{ t('currency') }}</span>
 </span>
 {%- endmacro %}
+
+{% macro money_usd(amount) -%}
+<span class="money money-usd">
+  <span class="money-sym">$</span>
+  <span class="money-num">{{ '{:,.2f}'.format(amount) }}</span>
+</span>
+{%- endmacro %}
+
+{% macro money_usd_ils(amount, rate) -%}
+<span class="money-pair" data-usd="{{ '%.4f'|format(amount) }}">
+  {{ money_usd(amount) }}
+  {% if rate and rate > 0 %}
+  <span class="money-ils muted-note">≈ {{ '{:,.2f}'.format(amount * rate) }} ₪</span>
+  {% endif %}
+</span>
+{%- endmacro %}

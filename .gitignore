@@ -4,6 +4,10 @@ __pycache__/
 data/*.db
 data/*.db-journal
 data/openai_key.txt
+data/yahoo_profile/
+data/yahoo_portfolios.json
+data/yahoo_storage.json
+data/investment_sectors.json
 .DS_Store
 *.egg-info/
 .env

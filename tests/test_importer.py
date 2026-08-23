@@ -120,6 +120,129 @@ def test_reimport_updates_billing_date(client, tmp_path):
     assert dynamika.value_date == date(2026, 9, 10)
 
 
+def _discount_bank_bytes() -> bytes:
+    rows = [
+        ["עובר ושב"] + [None] * 7,
+        [None] * 8,
+        ["חשבון: 0140178718 | אלייב יפית"] + [None] * 7,
+        [None] * 8,
+        [None] * 8,
+        ["תנועות אחרונות"] + [None] * 7,
+        [None] * 8,
+        [
+            "תאריך",
+            "יום ערך",
+            "תיאור התנועה",
+            "₪ זכות/חובה ",
+            "₪ יתרה ",
+            "אסמכתא",
+            "עמלה",
+            "ערוץ ביצוע",
+        ],
+        [
+            "2026-08-21 00:00:00",
+            "2026-08-21 00:00:00",
+            "חיוב לכרטיס ויזה 6352",
+            "-318.6",
+            "4943.98",
+            "1582",
+            "",
+            "סניף",
+        ],
+        [
+            "2026-08-09 00:00:00",
+            "2026-08-09 00:00:00",
+            "עמל הולדינ משכורת",
+            "4148.96",
+            "9849.55",
+            "1571",
+            "",
+            "יזום מחשב",
+        ],
+    ]
+    df = pd.DataFrame(rows)
+    buf = io.BytesIO()
+    df.to_excel(buf, header=False, index=False)
+    return buf.getvalue()
+
+
+def _discount_cc_bytes() -> bytes:
+    rows = [
+        ["כרטיסי אשראי"] + [None] * 17,
+        [None] * 18,
+        ["חשבון: 0140178718 | אלייב יפית"] + [None] * 17,
+        [None] * 18,
+        [None] * 18,
+        ["פירוט עסקאות - כל הכרטיסים הבנקאיים "] + [None] * 17,
+        [None] * 18,
+        [
+            "כרטיס",
+            "בית עסק",
+            "תאריך עסקה",
+            "סכום העסקה",
+            "מנפיק",
+            "סוג העסקה",
+            "פירוט",
+            "תאריך החיוב",
+            "סכום החיוב",
+        ] + [None] * 9,
+        [
+            "ויזה 6352",
+            "Gett",
+            "30/07/2026",
+            "35",
+            "כאל",
+            "ישראל",
+            "",
+            "02/08/2026",
+            "35",
+        ] + [None] * 9,
+        [
+            "מאסטרכארד 5539",
+            "דמי  כרטיס בנק דיסקונט",
+            "09/08/2026",
+            "-8.3",
+            "כאל",
+            "זיכוי-ישראל",
+            "",
+            "10/08/2026",
+            "-8.3",
+        ] + [None] * 9,
+    ]
+    df = pd.DataFrame(rows)
+    buf = io.BytesIO()
+    df.to_excel(buf, header=False, index=False)
+    return buf.getvalue()
+
+
+def test_discount_bank_statement_parses_signed_amounts():
+    rows = parse_file(_discount_bank_bytes(), "discount_oved.xlsx")
+    assert len(rows) == 2
+    by_desc = {r["description"]: r for r in rows}
+    assert by_desc["חיוב לכרטיס ויזה 6352"]["direction"] == "debit"
+    assert by_desc["חיוב לכרטיס ויזה 6352"]["amount"] == 318.6
+    assert by_desc["חיוב לכרטיס ויזה 6352"]["account"] == "0140178718"
+    assert by_desc["עמל הולדינ משכורת"]["direction"] == "credit"
+    assert by_desc["עמל הולדינ משכורת"]["amount"] == 4148.96
+    assert all(r["source"] == "bank" for r in rows)
+
+
+def test_discount_credit_card_parses_merchant_lines():
+    rows = parse_file(_discount_cc_bytes(), "discount_cc.xlsx")
+    assert len(rows) == 2
+    by_desc = {r["description"]: r for r in rows}
+    gett = by_desc["Gett"]
+    assert gett["txn_date"] == date(2026, 7, 30)
+    assert gett["value_date"] == date(2026, 8, 2)
+    assert gett["amount"] == 35
+    assert gett["direction"] == "debit"
+    assert gett["account"] == "6352"
+    fee = by_desc["דמי  כרטיס בנק דיסקונט"]
+    assert fee["direction"] == "credit"
+    assert fee["amount"] == 8.3
+    assert all(r["source"] == "card" for r in rows)
+
+
 def test_dashboard_month_uses_billing_date(client):
     from expense_tracker.importer import import_file
     import expense_tracker.db as db

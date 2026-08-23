@@ -1,4 +1,4 @@
-"""Import Bank Hapoalim and Isracard XLSX/CSV statements."""
+"""Import Bank Hapoalim, Discount Bank, and Isracard XLSX/CSV statements."""
 
 from __future__ import annotations
 
@@ -63,6 +63,22 @@ HEADER_MAP = {
     "סכום": "amount",
     "category": "category",
     "קטגוריה": "category",
+    # Discount Bank (עובר ושב)
+    "תיאור התנועה": "description",
+    "יום ערך": "value_date",
+    "זכות/חובה": "signed_amount",
+    "ערוץ ביצוע": "purpose",
+}
+
+# Discount Bank credit-card column aliases
+DISCOUNT_CC_HEADER_MAP = {
+    "כרטיס": "card",
+    "בית עסק": "description",
+    "תאריך עסקה": "txn_date",
+    "סכום העסקה": "txn_amount",
+    "תאריך החיוב": "value_date",
+    "סכום החיוב": "charge_amount",
+    "פירוט": "details",
 }
 
 # Isracard / credit-card column aliases -> canonical field
@@ -100,7 +116,7 @@ def excel_serial_to_date(value: Any) -> date | None:
         return None
     if text.isdigit():
         return excel_serial_to_date(int(text))
-    for fmt in ("%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%d", "%d/%m/%y", "%d.%m.%y"):
+    for fmt in ("%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%d", "%d/%m/%y", "%d.%m.%y", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(text, fmt).date()
         except ValueError:
@@ -125,6 +141,9 @@ def _find_header_row(df_raw: pd.DataFrame) -> int | None:
         # Hapoalim markers
         if "הפעולה" in joined or ("חובה" in joined and "זכות" in joined):
             return i
+        # Discount Bank (עובר ושב)
+        if "תיאור התנועה" in joined or ("זכות/חובה" in joined and "תאריך" in joined):
+            return i
         if "description" in row_vals and ("debit" in row_vals or "credit" in row_vals):
             return i
         if "date" in row_vals and "amount" in row_vals:
@@ -137,6 +156,9 @@ def _map_columns(headers: list[str]) -> dict[str, str]:
     mapping: dict[str, str] = {}
     for h in headers:
         key = _normalize_header(h).lower()
+        if "זכות/חובה" in key:
+            mapping[h] = "signed_amount"
+            continue
         for alias, field in HEADER_MAP.items():
             if key == alias.lower():
                 mapping[h] = field
@@ -147,6 +169,25 @@ def _map_columns(headers: list[str]) -> dict[str, str]:
                     mapping[h] = field
                     break
     return mapping
+
+
+def _parse_signed_amount(value: Any) -> float | None:
+    """Parse amount keeping sign (Discount Bank זכות/חובה column)."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if float(value) != 0 else None
+    text = str(value).strip().replace(",", "").replace("₪", "").replace("$", "")
+    text = text.replace(" ", "")
+    if not text or text == "-":
+        return None
+    if text.startswith("(") and text.endswith(")"):
+        text = "-" + text[1:-1]
+    try:
+        n = float(text)
+        return n if n != 0 else None
+    except ValueError:
+        return None
 
 
 def _parse_amount(value: Any) -> float | None:
@@ -170,6 +211,10 @@ def _parse_amount(value: Any) -> float | None:
 
 
 def _extract_account(meta_text: str) -> str:
+    # Discount: חשבון: 0140178718 | name
+    m = re.search(r"חשבון:\s*(\d+)", meta_text)
+    if m:
+        return m.group(1)
     # e.g. מספר חשבון  12-628-654839
     m = re.search(r"(\d{1,3}-\d{2,4}-\d{4,})", meta_text)
     if m:
@@ -226,9 +271,120 @@ def _is_credit_card_raw(raw: pd.DataFrame) -> bool:
     for i in range(len(raw)):
         for v in raw.iloc[i].tolist():
             text = _cell_str(v)
-            if "שם בית עסק" in text or "פירוט עסקאות" in text:
+            if "שם בית עסק" in text or (
+                "פירוט עסקאות" in text and "כל הכרטיסים" not in text
+            ):
                 return True
     return False
+
+
+def _is_discount_credit_card_raw(raw: pd.DataFrame) -> bool:
+    for i in range(min(20, len(raw))):
+        row_vals = [_normalize_header(v) for v in raw.iloc[i].tolist()]
+        if "בית עסק" in row_vals and "תאריך עסקה" in row_vals and "סכום החיוב" in row_vals:
+            return True
+        joined = " ".join(row_vals)
+        if "פירוט עסקאות - כל הכרטיסים" in joined:
+            return True
+    return False
+
+
+def _map_discount_cc_header_row(row_vals: list[str]) -> dict[int, str] | None:
+    mapping: dict[int, str] = {}
+    for idx, raw in enumerate(row_vals):
+        key = _normalize_header(raw)
+        if not key:
+            continue
+        for alias, field in DISCOUNT_CC_HEADER_MAP.items():
+            if key == alias or alias in key:
+                mapping[idx] = field
+                break
+    if "description" in mapping.values() and "txn_date" in mapping.values():
+        return mapping
+    return None
+
+
+def _card_last4(card_text: str) -> str:
+    m = re.search(r"(\d{4})\s*$", card_text.strip())
+    return m.group(1) if m else ""
+
+
+def rows_from_discount_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
+    """Parse Discount Bank כרטיסי אשראי export."""
+    account = ""
+    for i in range(min(8, len(raw))):
+        for v in raw.iloc[i].tolist():
+            text = _cell_str(v)
+            if "חשבון:" in text:
+                account = _extract_account(text) or account
+
+    rows: list[dict[str, Any]] = []
+    col_map: dict[int, str] | None = None
+
+    for i in range(len(raw)):
+        row_vals = [_normalize_header(v) for v in raw.iloc[i].tolist()]
+        joined = " ".join(v for v in row_vals if v)
+
+        new_map = _map_discount_cc_header_row(row_vals)
+        if new_map:
+            col_map = new_map
+            continue
+
+        if not col_map:
+            continue
+
+        if not any(row_vals):
+            col_map = None
+            continue
+
+        def get(field: str) -> str:
+            for idx, fname in col_map.items():
+                if fname == field and idx < len(row_vals):
+                    return row_vals[idx]
+            return ""
+
+        desc = get("description").strip()
+        if not desc or desc.startswith("סה") or "עסקאות לחיוב" in desc:
+            continue
+
+        txn_date = excel_serial_to_date(get("txn_date"))
+        if txn_date is None:
+            continue
+
+        charge_signed = _parse_signed_amount(get("charge_amount"))
+        txn_signed = _parse_signed_amount(get("txn_amount"))
+        signed = charge_signed if charge_signed is not None else txn_signed
+        if signed is None:
+            continue
+
+        if signed < 0:
+            direction = "credit"
+            amount = abs(signed)
+        else:
+            direction = "debit"
+            amount = signed
+
+        value_date = excel_serial_to_date(get("value_date")) or txn_date
+        details = get("details").replace("\n", " ").strip()
+        card = get("card")
+        card4 = _card_last4(card) if card else ""
+
+        rows.append(
+            {
+                "txn_date": txn_date,
+                "value_date": value_date,
+                "description": desc,
+                "details": details,
+                "reference": "",
+                "beneficiary": "",
+                "purpose": card.strip(),
+                "amount": float(amount),
+                "direction": direction,
+                "account": card4 or account,
+            }
+        )
+
+    return rows
 
 
 def _load_raw(file_bytes: bytes, filename: str) -> pd.DataFrame:
@@ -431,8 +587,8 @@ def rows_from_dataframe(df: pd.DataFrame, account: str) -> list[dict[str, Any]]:
     if "txn_date" not in col_map.values() and "description" not in col_map.values():
         raise ValueError(
             "Unrecognized columns. Expected Hapoalim headers "
-            "(תאריך, הפעולה, חובה, זכות), Isracard (שם בית עסק), "
-            "or Date/Description/Amount."
+            "(תאריך, הפעולה, חובה, זכות), Discount Bank (תיאור התנועה), "
+            "Isracard (שם בית עסק), or Date/Description/Amount."
         )
 
     inv = {v: k for k, v in col_map.items()}
@@ -483,8 +639,16 @@ def rows_from_dataframe(df: pd.DataFrame, account: str) -> list[dict[str, Any]]:
         debit = _parse_amount(get("debit")) if "debit" in inv else None
         credit = _parse_amount(get("credit")) if "credit" in inv else None
         single = _parse_amount(get("amount")) if "amount" in inv else None
+        signed = _parse_signed_amount(get("signed_amount")) if "signed_amount" in inv else None
 
-        if debit and credit:
+        if signed is not None:
+            if signed < 0:
+                direction = "debit"
+                amount = abs(signed)
+            else:
+                direction = "credit"
+                amount = signed
+        elif debit and credit:
             direction = "debit"
             amount = debit
         elif debit:
@@ -521,6 +685,9 @@ def parse_file(file_bytes: bytes, filename: str) -> list[dict[str, Any]]:
     raw = _load_raw(file_bytes, filename)
     if _is_credit_card_raw(raw):
         rows = rows_from_credit_card(raw)
+        kind = "card"
+    elif _is_discount_credit_card_raw(raw):
+        rows = rows_from_discount_credit_card(raw)
         kind = "card"
     else:
         df, account = read_dataframe(file_bytes, filename)

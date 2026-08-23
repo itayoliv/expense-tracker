@@ -153,8 +153,8 @@ def has_card_detail_imports(txns: list) -> bool:
 def is_bank_card_lump(txn) -> bool:
     """Bank statement lump charge for a credit card (not a merchant line item)."""
     desc = (txn.description or "").lower()
-    lumps = ("ישראכרט", "ויזה", "מקס")
-    if not any(x in desc for x in lumps):
+    lumps = ("ישראכרט", "ויזה", "מקס", "מאסטרכארד")
+    if not any(x in desc for x in lumps) and "חיוב לכרטיס" not in desc:
         return False
     return source_kind(txn) != "card"
 

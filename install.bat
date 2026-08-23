@@ -17,7 +17,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/3] Creating virtual environment (.venv)...
+echo [1/4] Creating virtual environment (.venv)...
 if not exist ".venv\Scripts\python.exe" (
     python -m venv .venv
     if errorlevel 1 (
@@ -29,16 +29,25 @@ if not exist ".venv\Scripts\python.exe" (
     echo       .venv already exists — skipping create.
 )
 
-echo [2/3] Installing dependencies...
+echo [2/4] Installing dependencies...
 ".venv\Scripts\python.exe" -m pip install --upgrade pip
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
+".venv\Scripts\python.exe" -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org -r requirements.txt
 if errorlevel 1 (
     echo ERROR: pip install failed.
     pause
     exit /b 1
 )
 
-echo [3/3] Setting up expense_tracker\.env...
+echo [3/4] Playwright package ready (uses installed Edge/Chrome for Yahoo Finance)...
+REM Optional: download Playwright Chromium if Edge/Chrome are unavailable.
+".venv\Scripts\python.exe" -m playwright install chromium >nul 2>&1
+if errorlevel 1 (
+    echo       Skipped Chromium download — will use Microsoft Edge or Chrome instead.
+) else (
+    echo       Playwright Chromium installed as a fallback browser.
+)
+
+echo [4/4] Setting up expense_tracker\.env...
 if not exist "expense_tracker\.env" (
     if exist "expense_tracker\.env.example" (
         copy /Y "expense_tracker\.env.example" "expense_tracker\.env" >nul
@@ -56,6 +65,7 @@ if not exist "data" mkdir data
 echo.
 echo Install complete.
 echo Next: double-click run.bat to start the app.
+echo Optional: double-click connect_yahoo.bat to link Yahoo Finance portfolios.
 echo.
 pause
 endlocal
