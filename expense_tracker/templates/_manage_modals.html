@@ -4,14 +4,20 @@
     <div id="category-list-panel">
       <div class="categories-header">
         <h3>{{ t('categories_title') }}</h3>
-        <button type="button" class="btn primary" id="btn-add-category">{{ t('add_category') }}</button>
+        <div class="categories-header-actions">
+          <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort-manage" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
+            {% if cat_sort == 'custom' %}{{ t('sort_categories_custom') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
+          </button>
+          <button type="button" class="btn primary" id="btn-add-category">{{ t('add_category') }}</button>
+        </div>
       </div>
       <div id="categories-list" class="categories-list">
         {% if not categories %}
           <div class="categories-empty">{{ t('no_categories') }}</div>
         {% else %}
           {% for c in categories %}
-          <div class="cat-manage-row" data-id="{{ c.id }}">
+          <div class="cat-manage-row" data-id="{{ c.id }}" draggable="true">
+            <span class="cat-drag-handle" title="{{ t('drag_to_reorder') }}" aria-hidden="true">⋮⋮</span>
             <span class="cat-manage-swatch" style="background:{{ c.color }}"></span>
             <div class="cat-manage-meta">
               <span class="cat-manage-name">{{ c.name }}</span>

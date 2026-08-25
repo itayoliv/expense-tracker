@@ -33,6 +33,7 @@
       usingRange: {{ using_range|tojson }},
       categories: {{ categories|tojson }},
       rules: {{ rules|tojson }},
+      catSort: {{ (cat_sort or 'alpha')|tojson }},
       pie: {{ summary.pie|tojson }},
       strings: {
         choose_category: {{ t('choose_category')|tojson }},
@@ -75,7 +76,10 @@
         gpt_sorting: {{ t('gpt_sorting')|tojson }},
         gpt_sort: {{ t('gpt_sort')|tojson }},
         openai_key_saved: {{ t('openai_key_saved')|tojson }},
-        openai_key_cleared: {{ t('openai_key_cleared')|tojson }}
+        openai_key_cleared: {{ t('openai_key_cleared')|tojson }},
+        sort_categories_alpha: {{ t('sort_categories_alpha')|tojson }},
+        sort_categories_custom: {{ t('sort_categories_custom')|tojson }},
+        drag_to_reorder: {{ t('drag_to_reorder')|tojson }}
       }
     };
   </script>

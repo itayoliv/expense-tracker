@@ -16,7 +16,7 @@ from expense_tracker.investment_sectors import (
     count_unassigned_symbols,
 )
 from expense_tracker.models import Category
-from expense_tracker.routes.helpers import lang, show_pie
+from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories
 from expense_tracker.services.payloads import category_payload, list_rule_payloads
 from expense_tracker.yahoo_finance import (
     YahooFinanceError,
@@ -68,8 +68,11 @@ def investments():
             usd_ils = 0.0
 
     with get_session() as session:
-        categories = list(
-            session.scalars(select(Category).order_by(Category.sort_order)).all()
+        sort_mode = cat_sort_mode()
+        categories = sort_categories(
+            session.scalars(select(Category)).all(),
+            current_lang,
+            sort_mode,
         )
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
@@ -87,6 +90,7 @@ def investments():
         categories=cats_json,
         rules=rules_json,
         summary=_empty_summary(),
+        cat_sort=sort_mode,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),
         connected=connected,

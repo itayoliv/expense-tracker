@@ -13,7 +13,7 @@ from expense_tracker.gpt_sort import has_api_key
 from expense_tracker.i18n import html_dir, t
 from expense_tracker.importer import import_file
 from expense_tracker.models import Category
-from expense_tracker.routes.helpers import lang, show_pie, view
+from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories, view
 from expense_tracker.services.payloads import category_payload, list_rule_payloads
 from expense_tracker.services.summary import (
     available_months,
@@ -83,15 +83,19 @@ def dashboard():
         if months and current_month not in months:
             months = sorted({*months, current_month}, reverse=True)
 
+        sort_mode = cat_sort_mode()
         summary = build_summary(
             session,
             current_view,
             current_lang,
             date_from=date_from,
             date_to=date_to,
+            cat_sort=sort_mode,
         )
-        categories = list(
-            session.scalars(select(Category).order_by(Category.sort_order)).all()
+        categories = sort_categories(
+            session.scalars(select(Category)).all(),
+            current_lang,
+            sort_mode,
         )
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
@@ -121,6 +125,7 @@ def dashboard():
         summary=summary,
         categories=cats_json,
         rules=rules_json,
+        cat_sort=sort_mode,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),
         t=lambda k, **kw: t(current_lang, k, **kw),

@@ -180,6 +180,11 @@
       {% endif %}
 
       <section class="table-panel">
+        <div class="table-panel-header">
+          <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
+            {% if cat_sort == 'custom' %}{{ t('sort_categories_custom') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
+          </button>
+        </div>
         <table class="expense-table" id="expense-table">
           <thead>
             <tr>

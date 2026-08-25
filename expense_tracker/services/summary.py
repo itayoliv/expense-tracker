@@ -192,6 +192,7 @@ def build_summary(
     *,
     date_from: date | None = None,
     date_to: date | None = None,
+    cat_sort: str = "alpha",
 ) -> dict:
     base = select(Transaction).options(joinedload(Transaction.category))
     start, end = resolve_date_range(date_from, date_to)
@@ -263,10 +264,17 @@ def build_summary(
             groups[key]["transactions"].append(txn)
 
     grand = sum(g["total"] for g in groups.values())
-    categories = sorted(
-        groups.values(),
-        key=lambda g: (-g["total"], g.get("sort_order", 999)),
-    )
+
+    def _group_sort_key(g: dict[str, Any]):
+        # Keep unsorted at the end of the dashboard table.
+        if g.get("key") == "__unsorted__":
+            return (1, 0, "")
+        name = (g.get("name") or "").casefold()
+        if cat_sort == "custom":
+            return (0, g.get("sort_order", 999), name)
+        return (0, 0, name)
+
+    categories = sorted(groups.values(), key=_group_sort_key)
     for g in categories:
         g["pct"] = round((g["total"] / grand * 100) if grand else 0, 2)
         g["transactions"].sort(

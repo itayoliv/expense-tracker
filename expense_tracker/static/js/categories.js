@@ -17,6 +17,7 @@
   const catColor = document.getElementById("cat-color");
   const catColorHex = document.getElementById("cat-color-hex");
   let managedCategories = Array.isArray(APP.categories) ? [...APP.categories] : [];
+  let dragSrcEl = null;
 
   function kindLabel(kind) {
     if (kind === "income") {
@@ -49,6 +50,51 @@
     if (categoryForm) categoryForm.classList.remove("hidden");
   }
 
+  function currentSortMode() {
+    return APP.catSort === "custom" ? "custom" : "alpha";
+  }
+
+  function sortLabel(mode) {
+    if (mode === "custom") {
+      return (APP.strings && APP.strings.sort_categories_custom) || "Custom";
+    }
+    return (APP.strings && APP.strings.sort_categories_alpha) || "A–Z";
+  }
+
+  function syncSortButtons() {
+    const mode = currentSortMode();
+    document.querySelectorAll(".btn-cat-sort").forEach((btn) => {
+      btn.dataset.mode = mode;
+      btn.textContent = sortLabel(mode);
+    });
+  }
+
+  async function setSortMode(mode) {
+    const next = mode === "custom" ? "custom" : "alpha";
+    const res = await fetch("/api/categories/sort-mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: next }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Error");
+      return;
+    }
+    location.reload();
+  }
+
+  function bindSortToggleButtons() {
+    document.querySelectorAll(".btn-cat-sort").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        const current = btn.dataset.mode || currentSortMode();
+        setSortMode(current === "custom" ? "alpha" : "custom");
+      });
+    });
+  }
+
   function bindCategoryRowActions() {
     if (!categoriesList) return;
     categoriesList.querySelectorAll(".btn-cat-edit").forEach((btn) => {
@@ -62,6 +108,81 @@
     });
   }
 
+  async function persistOrder() {
+    if (!categoriesList) return;
+    const ids = Array.from(categoriesList.querySelectorAll(".cat-manage-row"))
+      .map((row) => Number(row.dataset.id))
+      .filter((id) => Number.isFinite(id));
+    if (!ids.length) return;
+    const res = await fetch("/api/categories/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "Error");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (Array.isArray(data.categories)) {
+      managedCategories = data.categories;
+      APP.categories = managedCategories;
+    }
+    APP.catSort = "custom";
+    syncSortButtons();
+  }
+
+  function bindDragAndDrop() {
+    if (!categoriesList) return;
+    const rows = Array.from(categoriesList.querySelectorAll(".cat-manage-row"));
+    rows.forEach((row) => {
+      row.setAttribute("draggable", "true");
+      row.addEventListener("dragstart", (e) => {
+        dragSrcEl = row;
+        row.classList.add("is-dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", row.dataset.id || "");
+        }
+      });
+      row.addEventListener("dragend", () => {
+        row.classList.remove("is-dragging");
+        rows.forEach((r) => r.classList.remove("drag-over"));
+        dragSrcEl = null;
+      });
+      row.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        if (!dragSrcEl || dragSrcEl === row) return;
+        row.classList.add("drag-over");
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      });
+      row.addEventListener("dragleave", () => {
+        row.classList.remove("drag-over");
+      });
+      row.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        row.classList.remove("drag-over");
+        if (!dragSrcEl || dragSrcEl === row) return;
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        if (before) {
+          categoriesList.insertBefore(dragSrcEl, row);
+        } else {
+          categoriesList.insertBefore(dragSrcEl, row.nextSibling);
+        }
+        const orderedIds = Array.from(
+          categoriesList.querySelectorAll(".cat-manage-row")
+        ).map((r) => r.dataset.id);
+        managedCategories = orderedIds
+          .map((id) => managedCategories.find((c) => String(c.id) === String(id)))
+          .filter(Boolean);
+        APP.categories = managedCategories;
+        await persistOrder();
+      });
+    });
+  }
+
   function renderCategoriesList() {
     if (!categoriesList) return;
     if (!managedCategories.length) {
@@ -70,10 +191,13 @@
       }</div>`;
       return;
     }
+    const dragTitle =
+      (APP.strings && APP.strings.drag_to_reorder) || "Drag to reorder";
     categoriesList.innerHTML = managedCategories
       .map(
         (cat) => `
-      <div class="cat-manage-row" data-id="${cat.id}">
+      <div class="cat-manage-row" data-id="${cat.id}" draggable="true">
+        <span class="cat-drag-handle" title="${escapeHtml(dragTitle)}" aria-hidden="true">⋮⋮</span>
         <span class="cat-manage-swatch" style="background:${cat.color}"></span>
         <div class="cat-manage-meta">
           <span class="cat-manage-name">${escapeHtml(displayName(cat))}</span>
@@ -91,6 +215,7 @@
       )
       .join("");
     bindCategoryRowActions();
+    bindDragAndDrop();
   }
 
   function openCategoryEditor(cat) {
@@ -125,6 +250,8 @@
       if (res.ok && Array.isArray(data.categories)) {
         managedCategories = data.categories;
         APP.categories = managedCategories;
+        if (data.cat_sort) APP.catSort = data.cat_sort;
+        syncSortButtons();
         renderCategoriesList();
       }
     } catch {
@@ -146,6 +273,9 @@
   }
 
   bindCategoryRowActions();
+  bindDragAndDrop();
+  bindSortToggleButtons();
+  syncSortButtons();
 
   if (btnManageCategories) {
     btnManageCategories.addEventListener("click", () => {
