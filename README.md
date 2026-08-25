@@ -17,6 +17,16 @@ Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX 
 
 Optional: edit `expense_tracker/.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
 
+## Versioning
+
+This project uses [Semantic Versioning](https://semver.org/) starting at `0.1.0`.
+
+- Bump `PATCH` for bug fixes and small internal improvements.
+- Bump `MINOR` for new features that keep existing behavior working.
+- Bump `MAJOR` for breaking changes, incompatible data changes, or behavior users must adapt to.
+
+Update `expense_tracker.__version__` and `CHANGELOG.md` together for each release. Git tags should use the `vMAJOR.MINOR.PATCH` format, for example `v0.1.0`.
+
 ## Connect Yahoo Finance (portfolios)
 
 1. After `install.bat`, double-click **`connect_yahoo.bat`**.
