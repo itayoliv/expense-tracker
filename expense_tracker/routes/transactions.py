@@ -114,10 +114,8 @@ def update_transaction(txn_id: int):
                 }
             )
 
-        if "description" in payload and payload["description"] is not None:
-            txn.description = str(payload["description"]).strip() or txn.description
-        if "details" in payload and payload["details"] is not None:
-            txn.details = str(payload["details"]).strip()
+        if "custom_description" in payload and payload["custom_description"] is not None:
+            txn.custom_description = str(payload["custom_description"]).strip()
         if "amount" in payload and payload["amount"] not in (None, ""):
             txn.amount = abs(float(payload["amount"]))
         if "date" in payload and payload["date"]:

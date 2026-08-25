@@ -294,6 +294,13 @@ def _migrate_schema() -> None:
                 "ADD COLUMN categorized_by VARCHAR(16) NOT NULL DEFAULT ''"
             )
     txn_cols = _table_columns("transactions")
+    if txn_cols and "custom_description" not in txn_cols:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE transactions "
+                "ADD COLUMN custom_description TEXT NOT NULL DEFAULT ''"
+            )
+    txn_cols = _table_columns("transactions")
     if txn_cols and "split_group" not in txn_cols:
         with engine.begin() as conn:
             conn.exec_driver_sql(

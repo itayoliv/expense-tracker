@@ -108,6 +108,7 @@
   "transaction_split": "פוצל ל־{n} תנועות",
   "description": "תיאור",
   "details": "פרטים",
+  "custom_description": "תיאור מותאם",
   "import_success": "יובאו {added} תנועות ({skipped} כפילויות דולגו).",
   "import_error": "לא ניתן לייבא את הקובץ: {error}",
   "no_data": "אין עדיין תנועות. ייבאו דוח בנק או כרטיס אשראי כדי להתחיל.",

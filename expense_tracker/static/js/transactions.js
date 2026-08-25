@@ -255,6 +255,21 @@
     if (idEl) idEl.value = "";
     setSplitMode(false);
     if (btnSplitToggle) btnSplitToggle.classList.add("hidden");
+    setTxnOriginalFieldsReadonly(false);
+  }
+
+  function setTxnOriginalFieldsReadonly(readonly) {
+    const descInput = document.getElementById("txn-description");
+    const detailsInput = document.getElementById("txn-details");
+    const customWrap = document.getElementById("txn-custom-description-wrap");
+    const customInput = document.getElementById("txn-custom-description");
+    if (descInput) {
+      descInput.readOnly = Boolean(readonly);
+      descInput.required = !readonly;
+    }
+    if (detailsInput) detailsInput.readOnly = Boolean(readonly);
+    if (customWrap) customWrap.classList.toggle("hidden", !readonly);
+    if (customInput && !readonly) customInput.value = "";
   }
 
   // Add transaction
@@ -296,6 +311,9 @@
       document.getElementById("txn-id").value = data.id;
       document.getElementById("txn-description").value = data.description || "";
       document.getElementById("txn-details").value = data.details || "";
+      const customInput = document.getElementById("txn-custom-description");
+      if (customInput) customInput.value = data.custom_description || "";
+      setTxnOriginalFieldsReadonly(true);
       document.getElementById("txn-amount").value = data.amount;
       document.getElementById("txn-direction").value = data.direction || "debit";
       document.getElementById("txn-category").value = data.category_id || "";
@@ -407,6 +425,19 @@
           remember_rule: remember,
           apply_to_categorized: applyAll,
         };
+        if (id) {
+          body = {
+            custom_description: document.getElementById("txn-custom-description")
+              ? document.getElementById("txn-custom-description").value
+              : "",
+            date: document.getElementById("txn-date").value,
+            amount: document.getElementById("txn-amount").value,
+            direction: document.getElementById("txn-direction").value,
+            category_id: document.getElementById("txn-category").value || null,
+            remember_rule: remember,
+            apply_to_categorized: applyAll,
+          };
+        }
       }
 
       let res;

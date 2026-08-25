@@ -160,6 +160,7 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "id": x.id,
         "description": x.description,
         "details": x.details,
+        "custom_description": getattr(x, "custom_description", "") or "",
         "date": x.txn_date.strftime("%d/%m/%y"),
         "amount": x.amount,
         "direction": x.direction,

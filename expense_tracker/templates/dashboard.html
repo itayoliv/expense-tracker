@@ -226,6 +226,9 @@
                         style="--split-accent: {{ tx.split_accent }}"
                         {% endif %}>
                       <td>
+                        {% if tx.custom_description %}
+                          <div class="tx-custom-desc">{{ tx.custom_description }}</div>
+                        {% endif %}
                         <div class="tx-desc">
                           {{ tx.description }}
                           {% if tx.split_group %}
@@ -252,6 +255,7 @@
                           "id": tx.id,
                           "description": tx.description,
                           "details": tx.details,
+                          "custom_description": tx.custom_description,
                           "date": tx.date,
                           "amount": tx.amount,
                           "category_id": tx.category_id,
@@ -321,6 +325,10 @@
       <label>
         {{ t('details') }}
         <input type="text" name="details" id="txn-details">
+      </label>
+      <label id="txn-custom-description-wrap" class="hidden">
+        {{ t('custom_description') }}
+        <input type="text" name="custom_description" id="txn-custom-description">
       </label>
       <label>
         {{ t('date') }}

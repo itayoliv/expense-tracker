@@ -58,6 +58,7 @@ class Transaction(Base):
     value_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     description: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     details: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    custom_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     reference: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     beneficiary: Mapped[str] = mapped_column(String(256), nullable=False, default="")
     purpose: Mapped[str] = mapped_column(String(256), nullable=False, default="")

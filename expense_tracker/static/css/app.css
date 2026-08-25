@@ -490,8 +490,17 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   text-align: center;
   white-space: nowrap;
 }
+.tx-custom-desc {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
 .tx-desc { font-weight: 500; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .tx-details { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+.tx-custom-desc + .tx-desc {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 
 .gpt-badge {
   display: inline-flex;
@@ -618,6 +627,11 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+.modal-form input[readonly] {
+  background: color-mix(in srgb, var(--surface) 85%, var(--border));
+  color: var(--muted);
+  cursor: default;
 }
 .checkbox {
   flex-direction: row !important;
