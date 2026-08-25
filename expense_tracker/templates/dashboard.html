@@ -83,9 +83,10 @@
       <input type="search" id="unsorted-search" class="unsorted-search" placeholder="{{ t('search_unsorted') }}" autocomplete="off">
       <div class="unsorted-list">
         {% for u in summary.unsorted %}
-        <div class="unsorted-item" data-id="{{ u.id }}" data-date="{{ u.date }}" data-desc="{{ u.description }}" data-details="{{ u.details or '' }}" data-amount="{{ '%.2f'|format(u.amount) }}">
+        <div class="unsorted-item" data-id="{{ u.id }}" data-date="{{ u.date }}" data-desc="{{ u.description }}" data-details="{{ u.details or '' }}" data-custom-desc="{{ u.custom_description or '' }}" data-amount="{{ '%.2f'|format(u.amount) }}">
           <div class="u-meta">
             <span class="u-date">{{ u.date }}</span>
+            {% if u.custom_description %}<span class="u-custom-desc">{{ u.custom_description }}</span>{% endif %}
             <span class="u-desc">{{ u.description }}</span>
             {% if u.details %}<span class="u-details">{{ u.details }}</span>{% endif %}
             <span class="u-source">
@@ -95,6 +96,10 @@
           </div>
           <span class="u-amt">{{ money(u.amount) }}</span>
           <div class="u-cat-actions">
+            <label class="u-custom-desc-field">
+              <span class="u-custom-desc-label">{{ t('custom_description') }}</span>
+              <input type="text" class="u-custom-desc-input" value="{{ u.custom_description or '' }}" placeholder="{{ t('custom_description') }}" autocomplete="off">
+            </label>
             <select class="u-cat-select" data-txn-id="{{ u.id }}">
               <option value="">{{ t('choose_category') }}</option>
               {% for c in categories if c.kind == 'expense' %}

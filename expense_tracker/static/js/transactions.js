@@ -158,64 +158,80 @@
     }));
   }
 
-  // Unsorted quick categorize — Update appears only after a change
-  document.querySelectorAll(".unsorted-item").forEach((item) => {
-    const sel = item.querySelector(".u-cat-select");
-    const rememberBox = item.querySelector(".u-remember");
-    const applyBox = item.querySelector(".u-apply-categorized");
-    const updateBtn = item.querySelector(".u-update-btn");
-    if (!sel || !updateBtn) return;
+  function bindUnsortedItems() {
+    document.querySelectorAll(".unsorted-item").forEach((item) => {
+      if (item.dataset.bound === "1") return;
+      item.dataset.bound = "1";
+      const sel = item.querySelector(".u-cat-select");
+      const rememberBox = item.querySelector(".u-remember");
+      const applyBox = item.querySelector(".u-apply-categorized");
+      const customInput = item.querySelector(".u-custom-desc-input");
+      const updateBtn = item.querySelector(".u-update-btn");
+      if (!sel || !updateBtn) return;
 
-    const initial = {
-      category: sel.value || "",
-      remember: Boolean(rememberBox?.checked),
-      applyAll: Boolean(applyBox?.checked),
-    };
+      const initial = {
+        category: sel.value || "",
+        remember: Boolean(rememberBox?.checked),
+        applyAll: Boolean(applyBox?.checked),
+        customDescription: customInput ? customInput.value.trim() : "",
+      };
 
-    const syncUpdateBtn = () => {
-      const dirty =
-        (sel.value || "") !== initial.category ||
-        Boolean(rememberBox?.checked) !== initial.remember ||
-        Boolean(applyBox?.checked) !== initial.applyAll;
-      updateBtn.hidden = !dirty;
-    };
+      const syncUpdateBtn = () => {
+        const customDescription = customInput ? customInput.value.trim() : "";
+        const dirty =
+          (sel.value || "") !== initial.category ||
+          Boolean(rememberBox?.checked) !== initial.remember ||
+          Boolean(applyBox?.checked) !== initial.applyAll ||
+          customDescription !== initial.customDescription;
+        updateBtn.hidden = !dirty;
+      };
 
-    sel.addEventListener("change", syncUpdateBtn);
-    rememberBox?.addEventListener("change", syncUpdateBtn);
-    applyBox?.addEventListener("change", syncUpdateBtn);
+      sel.addEventListener("change", syncUpdateBtn);
+      rememberBox?.addEventListener("change", syncUpdateBtn);
+      applyBox?.addEventListener("change", syncUpdateBtn);
+      customInput?.addEventListener("input", syncUpdateBtn);
 
-    updateBtn.addEventListener("click", async () => {
-      const id = sel.dataset.txnId;
-      const category_id = sel.value || null;
-      if (!category_id) return;
-      updateBtn.disabled = true;
-      const res = await fetch(`/transactions/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          category_id,
+      updateBtn.addEventListener("click", async () => {
+        const id = sel.dataset.txnId;
+        const category_id = sel.value || null;
+        const custom_description = customInput ? customInput.value.trim() : "";
+        const customChanged = custom_description !== initial.customDescription;
+        if (!category_id && !customChanged) return;
+        updateBtn.disabled = true;
+        const body = {
+          custom_description,
           remember_rule: Boolean(rememberBox?.checked),
           apply_to_categorized: Boolean(applyBox?.checked),
-        }),
+        };
+        if (category_id) body.category_id = category_id;
+        const res = await fetch(`/transactions/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          location.reload();
+          return;
+        }
+        updateBtn.disabled = false;
       });
-      if (res.ok) {
-        location.reload();
-        return;
-      }
-      updateBtn.disabled = false;
     });
-  });
+  }
 
-  const unsortedSearch = document.getElementById("unsorted-search");
-  if (unsortedSearch) {
-    const items = Array.from(document.querySelectorAll(".unsorted-item"));
+  function bindUnsortedSearch() {
+    const unsortedSearch = document.getElementById("unsorted-search");
+    if (!unsortedSearch || unsortedSearch.dataset.bound === "1") return;
+    unsortedSearch.dataset.bound = "1";
     unsortedSearch.addEventListener("input", () => {
       const q = unsortedSearch.value.trim().toLowerCase().replace(/,/g, "");
-      items.forEach((item) => {
+      document.querySelectorAll(".unsorted-item").forEach((item) => {
+        const customInput = item.querySelector(".u-custom-desc-input");
         const hay = [
           item.dataset.date,
           item.dataset.desc,
           item.dataset.details,
+          item.dataset.customDesc,
+          customInput ? customInput.value : "",
           item.dataset.amount,
           item.textContent,
         ]
@@ -226,6 +242,66 @@
       });
     });
   }
+
+  function bindTransactionEdits() {
+    document.querySelectorAll(".btn-edit").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        let data;
+        try {
+          data = JSON.parse(btn.getAttribute("data-txn"));
+        } catch {
+          return;
+        }
+        setSplitMode(false);
+        document.getElementById("txn-id").value = data.id;
+        document.getElementById("txn-description").value = data.description || "";
+        document.getElementById("txn-details").value = data.details || "";
+        const customInput = document.getElementById("txn-custom-description");
+        if (customInput) customInput.value = data.custom_description || "";
+        setTxnOriginalFieldsReadonly(true);
+        document.getElementById("txn-amount").value = data.amount;
+        document.getElementById("txn-direction").value = data.direction || "debit";
+        document.getElementById("txn-category").value = data.category_id || "";
+        let isoDate = "";
+        const parts = (data.date || "").split("/");
+        if (parts.length === 3) {
+          let y = parseInt(parts[2], 10);
+          if (y < 100) y += 2000;
+          const m = parts[1].padStart(2, "0");
+          const d = parts[0].padStart(2, "0");
+          isoDate = `${y}-${m}-${d}`;
+          document.getElementById("txn-date").value = isoDate;
+        }
+        document.getElementById("remember-wrap").classList.remove("hidden");
+        const applyWrap = document.getElementById("apply-categorized-wrap");
+        if (applyWrap) applyWrap.classList.remove("hidden");
+        const rememberBox = document.getElementById("txn-remember");
+        if (rememberBox) rememberBox.checked = false;
+        const applyBox = document.getElementById("txn-apply-categorized");
+        if (applyBox) applyBox.checked = false;
+        const categoryWrap = document.getElementById("txn-category-wrap");
+        if (categoryWrap) categoryWrap.classList.remove("hidden");
+        document.getElementById("btn-delete").classList.remove("hidden");
+        if (btnSplitToggle) {
+          btnSplitToggle.classList.remove("hidden");
+          btnSplitToggle.dataset.seed = JSON.stringify({
+            description: data.description || "",
+            amount: data.amount,
+            category_id: data.category_id || "",
+            date: isoDate,
+          });
+        }
+        const title = document.getElementById("txn-modal-title");
+        if (title) title.textContent = (APP.strings && APP.strings.save) || "Save";
+        openModal(txnModal);
+      });
+    });
+  }
+
+  bindUnsortedItems();
+  bindUnsortedSearch();
 
   const btnGptSort = document.getElementById("btn-gpt-sort");
   if (btnGptSort) {
@@ -299,59 +375,7 @@
   }
 
   // Edit transaction
-  document.querySelectorAll(".btn-edit").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      let data;
-      try {
-        data = JSON.parse(btn.getAttribute("data-txn"));
-      } catch {
-        return;
-      }
-      setSplitMode(false);
-      document.getElementById("txn-id").value = data.id;
-      document.getElementById("txn-description").value = data.description || "";
-      document.getElementById("txn-details").value = data.details || "";
-      const customInput = document.getElementById("txn-custom-description");
-      if (customInput) customInput.value = data.custom_description || "";
-      setTxnOriginalFieldsReadonly(true);
-      document.getElementById("txn-amount").value = data.amount;
-      document.getElementById("txn-direction").value = data.direction || "debit";
-      document.getElementById("txn-category").value = data.category_id || "";
-      // Convert DD/MM/YY to YYYY-MM-DD
-      let isoDate = "";
-      const parts = (data.date || "").split("/");
-      if (parts.length === 3) {
-        let y = parseInt(parts[2], 10);
-        if (y < 100) y += 2000;
-        const m = parts[1].padStart(2, "0");
-        const d = parts[0].padStart(2, "0");
-        isoDate = `${y}-${m}-${d}`;
-        document.getElementById("txn-date").value = isoDate;
-      }
-      document.getElementById("remember-wrap").classList.remove("hidden");
-      const applyWrap = document.getElementById("apply-categorized-wrap");
-      if (applyWrap) applyWrap.classList.remove("hidden");
-      const rememberBox = document.getElementById("txn-remember");
-      if (rememberBox) rememberBox.checked = false;
-      const applyBox = document.getElementById("txn-apply-categorized");
-      if (applyBox) applyBox.checked = false;
-      const categoryWrap = document.getElementById("txn-category-wrap");
-      if (categoryWrap) categoryWrap.classList.remove("hidden");
-      document.getElementById("btn-delete").classList.remove("hidden");
-      if (btnSplitToggle) {
-        btnSplitToggle.classList.remove("hidden");
-        btnSplitToggle.dataset.seed = JSON.stringify({
-          description: data.description || "",
-          amount: data.amount,
-          category_id: data.category_id || "",
-          date: isoDate,
-        });
-      }
-      const title = document.getElementById("txn-modal-title");
-      if (title) title.textContent = (APP.strings && APP.strings.save) || "Save";
-      openModal(txnModal);
-    });
-  });
+  bindTransactionEdits();
 
   if (btnSplitToggle) {
     btnSplitToggle.addEventListener("click", () => {
@@ -478,4 +502,9 @@
       if (res.ok) location.reload();
     });
   }
+
+  APP.ui = APP.ui || ui;
+  APP.ui.bindUnsortedItems = bindUnsortedItems;
+  APP.ui.bindUnsortedSearch = bindUnsortedSearch;
+  APP.ui.bindTransactionEdits = bindTransactionEdits;
 })();

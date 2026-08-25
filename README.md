@@ -19,7 +19,7 @@ Optional: edit `expense_tracker/.env` (or use **Settings** in the app) to set an
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/) starting at `0.1.0`.
+This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2** (see [CHANGELOG.md](CHANGELOG.md)).
 
 - Bump `PATCH` for bug fixes and small internal improvements.
 - Bump `MINOR` for new features that keep existing behavior working.

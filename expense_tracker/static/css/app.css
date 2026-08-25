@@ -252,6 +252,44 @@ a { color: inherit; text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 .u-desc { font-weight: 600; }
+.u-custom-desc {
+  font-weight: 600;
+  color: #9a3412;
+}
+.u-custom-desc + .u-desc {
+  font-weight: 500;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+.u-custom-desc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.25rem;
+  width: 100%;
+}
+.u-custom-desc-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #c2410c;
+  opacity: 0.9;
+}
+.u-custom-desc-input {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #fdba74;
+  border-radius: 6px;
+  background: #fff7ed;
+  color: #7c2d12;
+  width: 100%;
+  max-width: 100%;
+}
+.u-custom-desc-input:focus {
+  outline: none;
+  border-color: #ea580c;
+  box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+}
 .u-details, .u-account {
   font-size: 0.82rem;
   color: #9a3412;
@@ -275,6 +313,12 @@ a { color: inherit; text-decoration: none; }
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem 0.75rem;
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+}
+.u-cat-actions .u-custom-desc-field {
+  flex: 1 1 100%;
+  margin-top: 0;
 }
 .u-cat-select {
   padding: 0.35rem 0.5rem;

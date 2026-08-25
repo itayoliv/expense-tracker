@@ -95,6 +95,67 @@
     });
   }
 
+  function parseDashboardAppFields(html) {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const script = Array.from(doc.querySelectorAll("script")).find((node) =>
+      (node.textContent || "").includes("window.APP")
+    );
+    if (!script) return {};
+    const text = script.textContent || "";
+    const fields = {};
+    const pieMatch = text.match(/pie:\s*(\{[\s\S]*?\}),\s*\n\s*strings:/);
+    if (pieMatch) {
+      try {
+        fields.pie = JSON.parse(pieMatch[1]);
+      } catch {
+        /* ignore malformed pie payload */
+      }
+    }
+    const sortMatch = text.match(/catSort:\s*"([^"]+)"/);
+    if (sortMatch) fields.catSort = sortMatch[1];
+    return fields;
+  }
+
+  async function refreshDashboardBackground() {
+    try {
+      const res = await fetch(window.location.href, {
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
+      if (!res.ok) return;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      const newGrid = doc.querySelector(".content-grid");
+      const oldGrid = document.querySelector(".content-grid");
+      if (newGrid && oldGrid) {
+        oldGrid.replaceWith(document.importNode(newGrid, true));
+      }
+
+      const newBanner = doc.getElementById("unsorted-banner");
+      const oldBanner = document.getElementById("unsorted-banner");
+      if (newBanner && oldBanner) {
+        oldBanner.replaceWith(document.importNode(newBanner, true));
+      } else if (!newBanner && oldBanner) {
+        oldBanner.remove();
+      }
+
+      const fields = parseDashboardAppFields(html);
+      if (fields.pie) APP.pie = fields.pie;
+      if (fields.catSort) APP.catSort = fields.catSort;
+
+      syncSortButtons();
+      bindSortToggleButtons();
+      if (ui.bindCategoryRows) ui.bindCategoryRows();
+      if (ui.bindTransactionEdits) ui.bindTransactionEdits();
+      if (ui.bindUnsortedItems) ui.bindUnsortedItems();
+      if (ui.bindUnsortedSearch) ui.bindUnsortedSearch();
+      if (ui.refreshPie) ui.refreshPie();
+    } catch {
+      /* keep modal open even if background refresh fails */
+    }
+  }
+
   function bindCategoryRowActions() {
     if (!categoriesList) return;
     categoriesList.querySelectorAll(".btn-cat-edit").forEach((btn) => {
@@ -131,6 +192,11 @@
     }
     APP.catSort = "custom";
     syncSortButtons();
+    if (categoriesModal && categoriesModal.open) {
+      await refreshDashboardBackground();
+      return;
+    }
+    location.reload();
   }
 
   function bindDragAndDrop() {

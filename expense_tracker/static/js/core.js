@@ -35,6 +35,7 @@
   ui.openModal = openModal;
   ui.closeModal = closeModal;
   ui.displayName = displayName;
+  ui.bindCategoryRows = bindCategoryRows;
 
   // Flash auto-dismiss
   const flash = document.getElementById("flash-wrap");
@@ -58,13 +59,18 @@
     if (detail) detail.classList.toggle("hidden", !open);
   }
 
-  document.querySelectorAll(".cat-row").forEach((row) => {
-    const btn = row.querySelector(".cat-toggle");
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      setOpen(row, !row.classList.contains("open"));
+  function bindCategoryRows() {
+    document.querySelectorAll(".cat-row").forEach((row) => {
+      const btn = row.querySelector(".cat-toggle");
+      if (!btn || btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        setOpen(row, !row.classList.contains("open"));
+      });
     });
-  });
+  }
+
+  bindCategoryRows();
 
   const openAll = document.getElementById("btn-open-all");
   const closeAll = document.getElementById("btn-close-all");

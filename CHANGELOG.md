@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+## 0.4.2 - 2026-08-26
+
+- Refresh the dashboard table and pie chart in the background after each category drag-and-drop, while Manage Categories stays open.
+
+## 0.4.1 - 2026-08-26
+
+- Add a custom description field to uncategorized transactions in the orange banner, placed before the category selector.
+
 ## 0.4.0 - 2026-08-25
 
 - Sort categories A–Z by default across the dashboard, dropdowns, and Manage Categories.

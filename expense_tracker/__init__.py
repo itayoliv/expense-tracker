@@ -10,7 +10,7 @@ from flask import Flask
 from expense_tracker.db import init_db
 from expense_tracker.routes import register_blueprints
 
-__version__ = "0.4.0"
+__version__ = "0.4.2"
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 ROOT = PACKAGE_DIR.parent
