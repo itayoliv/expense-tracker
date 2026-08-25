@@ -120,9 +120,17 @@ a { color: inherit; text-decoration: none; }
 }
 
 .topbar-title h1 {
-  margin: 0 0 0.5rem;
+  margin: 0 0 0.15rem;
   font-size: 1.5rem;
   font-weight: 700;
+}
+
+.app-version {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .period-form {

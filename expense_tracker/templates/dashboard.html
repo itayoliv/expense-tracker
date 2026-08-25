@@ -45,6 +45,7 @@
           {% elif view == 'income' %}{{ t('income') }}
           {% else %}{{ t('bottom_line') }}{% endif %}
         </h1>
+        <div class="app-version">v{{ app_version }}</div>
         <form class="period-form" method="get" action="{{ url_for('pages.dashboard') }}" id="period-form">
           <input type="hidden" name="view" value="{{ view }}">
           <div class="period-range">
