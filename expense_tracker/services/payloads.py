@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from expense_tracker.categorizer import category_map
 from expense_tracker.i18n import category_name
-from expense_tracker.models import CategorizationRule, Category
+from expense_tracker.models import CategorizationRule, Category, Tag
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -35,6 +35,65 @@ def category_payload(lang: str, cat: Category) -> dict[str, Any]:
         "color": cat.color,
         "sort_order": cat.sort_order,
     }
+
+
+def tag_payload(tag: Tag, *, txn_count: int = 0, total: float = 0.0) -> dict[str, Any]:
+    return {
+        "id": tag.id,
+        "name": tag.name,
+        "color": tag.color,
+        "txn_count": txn_count,
+        "total": round(total, 2),
+    }
+
+
+def list_tag_payloads(session) -> list[dict[str, Any]]:
+    tags = session.scalars(select(Tag).order_by(Tag.name)).all()
+    payloads = []
+    for tag in tags:
+        txns = list(tag.transactions or [])
+        payloads.append(
+            tag_payload(
+                tag,
+                txn_count=len(txns),
+                total=sum(float(t.amount or 0) for t in txns),
+            )
+        )
+    return payloads
+
+
+def parse_tag_ids(payload: dict) -> list[int] | None:
+    """Return tag ids when present in payload, else None (field omitted)."""
+    if "tag_ids" not in payload:
+        return None
+    raw = payload.get("tag_ids")
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("tag_ids must be a list")
+    ids: list[int] = []
+    seen: set[int] = set()
+    for item in raw:
+        try:
+            tid = int(item)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("tag_ids must be integers") from exc
+        if tid not in seen:
+            seen.add(tid)
+            ids.append(tid)
+    return ids
+
+
+def resolve_tags(session, tag_ids: list[int]) -> list[Tag]:
+    if not tag_ids:
+        return []
+    tags = {
+        t.id: t
+        for t in session.scalars(select(Tag).where(Tag.id.in_(tag_ids))).all()
+    }
+    if len(tags) != len(set(tag_ids)):
+        raise ValueError("Unknown tag id")
+    return [tags[i] for i in tag_ids]
 
 
 def rule_payload(

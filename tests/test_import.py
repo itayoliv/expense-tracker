@@ -98,8 +98,13 @@ def test_dashboard_defaults_to_current_month(client):
     html = client.get("/").get_data(as_text=True)
     assert "ThisMonth" in html
     assert "OtherMonth" not in html
-    first = f"{today.year:04d}-{today.month:02d}-01"
-    assert f'value="{first}"' in html
+    import calendar
+
+    month_key = f"{today.year:04d}-{today.month:02d}"
+    last = calendar.monthrange(today.year, today.month)[1]
+    assert f'value="{month_key}"' in html
+    assert f'value="{month_key}-{last:02d}"' in html
+    assert 'type="month"' in html
     assert 'id="month"' not in html
 
 
@@ -168,7 +173,7 @@ def test_date_range_filters_transactions(client):
     assert "InRange" in html
     assert "OutOfRange" not in html
     assert 'id="date_from"' in html
-    assert 'value="2026-08-01"' in html
+    assert 'value="2026-08"' in html or 'value="2026-08-01"' in html
     assert 'value="2026-08-31"' in html
 
 
@@ -208,8 +213,8 @@ def test_open_date_to_includes_whole_month(client):
     assert "Early" in html
     assert "Late" in html
     assert "NextMonth" not in html
-    assert 'value="2026-08-01"' in html
-    assert 'value=""' in html or 'value="2026-08-31"' not in html.split('id="date_to"')[1][:80]
+    assert 'value="2026-08"' in html or 'value="2026-08-01"' in html
+    assert 'value="2026-08-31"' in html
 
 
 def test_import_accepts_multiple_files(client):

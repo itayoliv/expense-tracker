@@ -17,6 +17,7 @@ from expense_tracker.i18n import t
 from expense_tracker.models import Category, Transaction
 from expense_tracker.routes.helpers import lang
 from expense_tracker.services.dates import parse_txn_date
+from expense_tracker.services.payloads import parse_tag_ids, resolve_tags
 from expense_tracker.services.split import split_transaction
 
 bp = Blueprint("transactions", __name__)
@@ -124,6 +125,13 @@ def update_transaction(txn_id: int):
             cid = payload["category_id"]
             txn.category_id = int(cid) if cid not in (None, "", "null") else None
             txn.categorized_by = ""
+        try:
+            tag_ids = parse_tag_ids(payload)
+            if tag_ids is not None:
+                txn.tags = resolve_tags(session, tag_ids)
+        except Exception as e:
+            session.rollback()
+            return jsonify({"ok": False, "error": str(e)}), 400
 
         applied = 0
         if txn.category_id and txn.description:

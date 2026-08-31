@@ -3,7 +3,10 @@
 {% block body %}
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">{{ t('app_title') }}</div>
+    <div class="brand-block">
+      <div class="brand">Expense Tracker</div>
+      <div class="app-version">v{{ app_version }}</div>
+    </div>
     <nav class="nav">
       <div class="nav-section">
         <div class="nav-label">{{ t('nav_snapshot') }}</div>
@@ -15,6 +18,7 @@
       <div class="nav-section">
         <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-tags">{{ t('manage_tags') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
       </div>
       <div class="nav-section muted">

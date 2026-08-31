@@ -17,7 +17,7 @@ from expense_tracker.investment_sectors import (
 )
 from expense_tracker.models import Category
 from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories
-from expense_tracker.services.payloads import category_payload, list_rule_payloads
+from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
 from expense_tracker.yahoo_finance import (
     YahooFinanceError,
     build_holdings_history,
@@ -76,6 +76,7 @@ def investments():
         )
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
+        tags_json = list_tag_payloads(session)
 
     return render_template(
         "investments.html",
@@ -89,6 +90,7 @@ def investments():
         filter_period={},
         categories=cats_json,
         rules=rules_json,
+        tags=tags_json,
         summary=_empty_summary(),
         cat_sort=sort_mode,
         show_pie=show_pie(),

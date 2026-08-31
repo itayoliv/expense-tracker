@@ -33,6 +33,7 @@
       usingRange: {{ using_range|tojson }},
       categories: {{ categories|tojson }},
       rules: {{ rules|tojson }},
+      tags: {{ (tags or [])|tojson }},
       catSort: {{ (cat_sort or 'alpha')|tojson }},
       pie: {{ summary.pie|tojson }},
       strings: {
@@ -49,6 +50,7 @@
         split_hint: {{ t('split_hint')|tojson }},
         unsorted: {{ t('unsorted')|tojson }},
         description: {{ t('description')|tojson }},
+        custom_description: {{ t('custom_description')|tojson }},
         category: {{ t('category')|tojson }},
         amount: {{ t('amount')|tojson }},
         currency: {{ t('currency')|tojson }},
@@ -66,9 +68,19 @@
         kind_income: {{ t('kind_income')|tojson }},
         no_categories: {{ t('no_categories')|tojson }},
         no_rules: {{ t('no_rules')|tojson }},
+        rules_count: {{ t('rules_count')|tojson }},
         add_rule: {{ t('add_rule')|tojson }},
         edit_rule: {{ t('edit_rule')|tojson }},
         confirm_delete_rule: {{ t('confirm_delete_rule')|tojson }},
+        add_tag: {{ t('add_tag')|tojson }},
+        edit_tag: {{ t('edit_tag')|tojson }},
+        no_tags: {{ t('no_tags')|tojson }},
+        tags_count: {{ t('tags_count')|tojson }},
+        confirm_delete_tag: {{ t('confirm_delete_tag')|tojson }},
+        tags: {{ t('tags')|tojson }},
+        sum_tags: {{ t('sum_tags')|tojson }},
+        sum_tags_hint: {{ t('sum_tags_hint')|tojson }},
+        sum_tags_result: {{ t('sum_tags_result')|tojson }},
         seed_categories: {{ t('seed_categories')|tojson }},
         seed_categories_none: {{ t('seed_categories_none')|tojson }},
         clear_transactions_confirm: {{ t('clear_transactions_confirm')|tojson }},
@@ -89,6 +101,7 @@
   <script defer src="{{ url_for('static', filename='js/transactions.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/categories.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/rules.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/tags.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/settings.js') }}"></script>
   {% block scripts %}{% endblock %}
 </body>

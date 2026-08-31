@@ -37,6 +37,7 @@ def _parse_splits(raw: Any) -> list[dict[str, Any]]:
         parts.append(
             {
                 "description": desc,
+                "custom_description": str(item.get("custom_description") or "").strip(),
                 "amount": round(amount, 2),
                 "category_id": category_id,
             }
@@ -59,6 +60,9 @@ def split_transaction(
     category when a part does not specify one. Optional remember/apply runs
     per part description (same behavior as a normal edit).
     """
+    if (getattr(txn, "split_group", "") or "").strip():
+        raise ValueError("This transaction was already split and cannot be split again")
+
     parts = _parse_splits(raw_splits)
     parent_category_id = txn.category_id
     for part in parts:
@@ -95,6 +99,7 @@ def split_transaction(
             value_date=txn.value_date,
             description=part["description"],
             details=detail_note,
+            custom_description=part.get("custom_description") or "",
             reference=f"{base_ref}-split-{i + 1}-{stamp}",
             beneficiary=txn.beneficiary or "",
             purpose=txn.purpose or "",

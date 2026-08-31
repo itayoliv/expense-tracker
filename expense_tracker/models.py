@@ -7,12 +7,14 @@ from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -21,6 +23,14 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 class Base(DeclarativeBase):
     pass
+
+
+transaction_tags = Table(
+    "transaction_tags",
+    Base.metadata,
+    Column("transaction_id", ForeignKey("transactions.id"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id"), primary_key=True),
+)
 
 
 class Category(Base):
@@ -37,6 +47,18 @@ class Category(Base):
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="category")
     rules: Mapped[list["CategorizationRule"]] = relationship(
         back_populates="category", cascade="all, delete-orphan"
+    )
+
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    color: Mapped[str] = mapped_column(String(16), nullable=False, default="#6B7280")
+
+    transactions: Mapped[list["Transaction"]] = relationship(
+        secondary=transaction_tags, back_populates="tags"
     )
 
 
@@ -78,6 +100,9 @@ class Transaction(Base):
     is_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     category: Mapped[Optional[Category]] = relationship(back_populates="transactions")
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=transaction_tags, back_populates="transactions"
+    )
 
 
 class CategorizationRule(Base):

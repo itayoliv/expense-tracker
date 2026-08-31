@@ -85,4 +85,39 @@
     });
   }
 
+  // From = month picker → To cannot be before the 1st of that month
+  const dateFrom = document.getElementById("date_from");
+  const dateTo = document.getElementById("date_to");
+  function lastDayOfMonth(year, monthIndex0) {
+    return new Date(year, monthIndex0 + 1, 0).getDate();
+  }
+  function syncDateToMin() {
+    if (!dateFrom || !dateTo || dateFrom.type !== "month") return;
+    const monthVal = dateFrom.value; // YYYY-MM
+    if (!monthVal || monthVal.length < 7) {
+      dateTo.removeAttribute("min");
+      return;
+    }
+    const minDay = `${monthVal}-01`;
+    dateTo.min = minDay;
+    if (dateTo.value && dateTo.value < minDay) {
+      const [y, m] = monthVal.split("-").map(Number);
+      const last = String(lastDayOfMonth(y, m - 1)).padStart(2, "0");
+      dateTo.value = `${monthVal}-${last}`;
+    }
+  }
+  if (dateFrom && dateTo) {
+    syncDateToMin();
+    dateFrom.addEventListener("change", () => {
+      const monthVal = dateFrom.value;
+      if (monthVal && monthVal.length >= 7) {
+        const [y, m] = monthVal.split("-").map(Number);
+        const last = String(lastDayOfMonth(y, m - 1)).padStart(2, "0");
+        // Keep To inside the selected month when From changes
+        dateTo.value = `${monthVal}-${last}`;
+      }
+      syncDateToMin();
+    });
+  }
+
 })();

@@ -22,6 +22,40 @@
 
   let splitMode = false;
   let splitTargetTotal = 0;
+  let splitParentDescription = "";
+
+  function selectedTagIds(picker) {
+    if (!picker) return [];
+    return Array.from(picker.querySelectorAll(".tag-chip-toggle.selected"))
+      .map((btn) => Number(btn.dataset.tagId))
+      .filter((id) => Number.isFinite(id));
+  }
+
+  function setTagPickerSelection(picker, tagIds) {
+    if (!picker) return;
+    const selected = new Set((tagIds || []).map(String));
+    picker.querySelectorAll(".tag-chip-toggle").forEach((btn) => {
+      btn.classList.toggle("selected", selected.has(String(btn.dataset.tagId)));
+    });
+    picker.dataset.selected = Array.from(selected).join(",");
+  }
+
+  function bindTagPickers(root) {
+    const scope = root || document;
+    scope.querySelectorAll(".tag-chip-toggle").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        btn.classList.toggle("selected");
+        const picker = btn.closest(".tag-picker");
+        if (picker) {
+          picker.dataset.selected = selectedTagIds(picker).join(",");
+          picker.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      });
+    });
+  }
 
   function categoryOptionsHtml(selected) {
     const unsorted = str("unsorted", "Unsorted");
@@ -66,12 +100,20 @@
   function addSplitRow(initial) {
     if (!splitRows) return;
     const data = initial || {};
+    const parentDesc =
+      data.description ||
+      splitParentDescription ||
+      "";
     const row = document.createElement("div");
     row.className = "txn-split-row";
     row.innerHTML = `
-      <label>
+      <label class="split-desc-field">
         ${str("description", "Description")}
-        <input type="text" class="split-description" required value="">
+        <input type="text" class="split-description" required readonly value="">
+      </label>
+      <label class="split-custom-field">
+        ${str("custom_description", "Custom description")}
+        <input type="text" class="split-custom-description" value="">
       </label>
       <label>
         ${str("amount", "Amount")}
@@ -87,8 +129,10 @@
       )}</button>
     `;
     const desc = row.querySelector(".split-description");
+    const customDesc = row.querySelector(".split-custom-description");
     const amount = row.querySelector(".split-amount");
-    if (desc) desc.value = data.description || "";
+    if (desc) desc.value = parentDesc;
+    if (customDesc) customDesc.value = data.custom_description || "";
     if (amount) amount.value = data.amount != null ? data.amount : "";
     amount.addEventListener("input", updateSplitRemaining);
     row.querySelector(".split-remove").addEventListener("click", () => {
@@ -104,6 +148,7 @@
     splitMode = Boolean(on);
     if (singleFields) singleFields.classList.toggle("hidden", splitMode);
     if (splitPanel) splitPanel.classList.toggle("hidden", !splitMode);
+    if (txnModal) txnModal.classList.toggle("modal-split", splitMode);
     if (btnSplitToggle) {
       btnSplitToggle.textContent = splitMode
         ? str("split_unsplit", "Cancel split")
@@ -119,10 +164,15 @@
     if (splitDateEl) splitDateEl.required = splitMode;
 
     if (!splitMode) {
+      splitParentDescription = "";
       if (splitRows) splitRows.innerHTML = "";
       return;
     }
 
+    splitParentDescription =
+      (seed && seed.description) ||
+      (descInput && descInput.value) ||
+      "";
     splitTargetTotal = round2(
       (seed && seed.amount) ||
         document.getElementById("txn-amount").value ||
@@ -139,12 +189,14 @@
     const rest = round2(splitTargetTotal - half);
     const parentCategory = (seed && seed.category_id) || "";
     addSplitRow({
-      description: (seed && seed.description) || "",
+      description: splitParentDescription,
+      custom_description: "",
       amount: half || "",
       category_id: parentCategory,
     });
     addSplitRow({
-      description: "",
+      description: splitParentDescription,
+      custom_description: "",
       amount: rest || "",
       category_id: parentCategory,
     });
@@ -152,7 +204,12 @@
 
   function collectSplits() {
     return Array.from(splitRows.querySelectorAll(".txn-split-row")).map((row) => ({
-      description: row.querySelector(".split-description").value.trim(),
+      description:
+        splitParentDescription ||
+        row.querySelector(".split-description").value.trim(),
+      custom_description: (
+        row.querySelector(".split-custom-description") || { value: "" }
+      ).value.trim(),
       amount: row.querySelector(".split-amount").value,
       category_id: row.querySelector(".split-category").value || null,
     }));
@@ -166,14 +223,18 @@
       const rememberBox = item.querySelector(".u-remember");
       const applyBox = item.querySelector(".u-apply-categorized");
       const customInput = item.querySelector(".u-custom-desc-input");
+      const tagPicker = item.querySelector(".u-tag-picker");
       const updateBtn = item.querySelector(".u-update-btn");
       if (!sel || !updateBtn) return;
+
+      bindTagPickers(item);
 
       const initial = {
         category: sel.value || "",
         remember: Boolean(rememberBox?.checked),
         applyAll: Boolean(applyBox?.checked),
         customDescription: customInput ? customInput.value.trim() : "",
+        tagIds: selectedTagIds(tagPicker).join(","),
       };
 
       const syncUpdateBtn = () => {
@@ -182,7 +243,8 @@
           (sel.value || "") !== initial.category ||
           Boolean(rememberBox?.checked) !== initial.remember ||
           Boolean(applyBox?.checked) !== initial.applyAll ||
-          customDescription !== initial.customDescription;
+          customDescription !== initial.customDescription ||
+          selectedTagIds(tagPicker).join(",") !== initial.tagIds;
         updateBtn.hidden = !dirty;
       };
 
@@ -190,16 +252,19 @@
       rememberBox?.addEventListener("change", syncUpdateBtn);
       applyBox?.addEventListener("change", syncUpdateBtn);
       customInput?.addEventListener("input", syncUpdateBtn);
+      tagPicker?.addEventListener("change", syncUpdateBtn);
 
       updateBtn.addEventListener("click", async () => {
         const id = sel.dataset.txnId;
         const category_id = sel.value || null;
         const custom_description = customInput ? customInput.value.trim() : "";
         const customChanged = custom_description !== initial.customDescription;
-        if (!category_id && !customChanged) return;
+        const tagsChanged = selectedTagIds(tagPicker).join(",") !== initial.tagIds;
+        if (!category_id && !customChanged && !tagsChanged) return;
         updateBtn.disabled = true;
         const body = {
           custom_description,
+          tag_ids: selectedTagIds(tagPicker),
           remember_rule: Boolean(rememberBox?.checked),
           apply_to_categorized: Boolean(applyBox?.checked),
         };
@@ -264,6 +329,11 @@
         document.getElementById("txn-amount").value = data.amount;
         document.getElementById("txn-direction").value = data.direction || "debit";
         document.getElementById("txn-category").value = data.category_id || "";
+        setTagPickerSelection(
+          document.getElementById("txn-tag-picker"),
+          data.tag_ids || []
+        );
+        bindTagPickers(document.getElementById("txn-tag-picker"));
         let isoDate = "";
         const parts = (data.date || "").split("/");
         if (parts.length === 3) {
@@ -285,9 +355,11 @@
         if (categoryWrap) categoryWrap.classList.remove("hidden");
         document.getElementById("btn-delete").classList.remove("hidden");
         if (btnSplitToggle) {
-          btnSplitToggle.classList.remove("hidden");
+          const alreadySplit = Boolean(data.split_group);
+          btnSplitToggle.classList.toggle("hidden", alreadySplit);
           btnSplitToggle.dataset.seed = JSON.stringify({
             description: data.description || "",
+            custom_description: data.custom_description || "",
             amount: data.amount,
             category_id: data.category_id || "",
             date: isoDate,
@@ -332,6 +404,7 @@
     setSplitMode(false);
     if (btnSplitToggle) btnSplitToggle.classList.add("hidden");
     setTxnOriginalFieldsReadonly(false);
+    setTagPickerSelection(document.getElementById("txn-tag-picker"), []);
   }
 
   function setTxnOriginalFieldsReadonly(readonly) {
@@ -370,6 +443,7 @@
       document.getElementById("txn-date").value = today;
       document.getElementById("txn-direction").value =
         APP.view === "income" ? "credit" : "debit";
+      bindTagPickers(document.getElementById("txn-tag-picker"));
       openModal(txnModal);
     });
   }
@@ -406,7 +480,11 @@
         document.getElementById("txn-category")?.value ||
         (splitRows.querySelector(".split-category") || {}).value ||
         "";
-      addSplitRow({ amount: "", category_id: parentCategory });
+      addSplitRow({
+        description: splitParentDescription,
+        amount: "",
+        category_id: parentCategory,
+      });
     });
   }
 
@@ -458,6 +536,7 @@
             amount: document.getElementById("txn-amount").value,
             direction: document.getElementById("txn-direction").value,
             category_id: document.getElementById("txn-category").value || null,
+            tag_ids: selectedTagIds(document.getElementById("txn-tag-picker")),
             remember_rule: remember,
             apply_to_categorized: applyAll,
           };
@@ -507,4 +586,6 @@
   APP.ui.bindUnsortedItems = bindUnsortedItems;
   APP.ui.bindUnsortedSearch = bindUnsortedSearch;
   APP.ui.bindTransactionEdits = bindTransactionEdits;
+  APP.ui.bindTagPickers = bindTagPickers;
+  bindTagPickers();
 })();

@@ -14,12 +14,14 @@ from expense_tracker.i18n import html_dir, t
 from expense_tracker.importer import import_file
 from expense_tracker.models import Category
 from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories, view
-from expense_tracker.services.payloads import category_payload, list_rule_payloads
+from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
 from expense_tracker.services.summary import (
     available_months,
     build_summary,
     current_month_key,
     first_day_of_month,
+    last_day_of_month,
+    parse_date_from_arg,
     parse_iso_date,
     parse_month,
 )
@@ -45,12 +47,14 @@ def _allowed_upload(storage) -> bool:
 
 
 def _dashboard_dates() -> tuple[date | None, date | None, bool]:
-    """Return raw from/to dates and whether the user chose an explicit range."""
+    """Return from/to dates and whether the user chose an explicit range."""
     has_date_args = "date_from" in request.args or "date_to" in request.args
     if has_date_args:
-        return parse_iso_date(request.args.get("date_from")), parse_iso_date(
-            request.args.get("date_to")
-        ), True
+        date_from = parse_date_from_arg(request.args.get("date_from"))
+        date_to = parse_iso_date(request.args.get("date_to"))
+        if date_from and not date_to:
+            date_to = last_day_of_month(date_from)
+        return date_from, date_to, True
 
     month_raw = (request.args.get("month") or "").strip()
     if month_raw:
@@ -59,10 +63,13 @@ def _dashboard_dates() -> tuple[date | None, date | None, bool]:
         parsed = parse_month(month_raw)
         if parsed:
             y, m = parsed
-            return date(y, m, 1), None, True
-        return first_day_of_month(), None, False
+            start = date(y, m, 1)
+            return start, last_day_of_month(start), True
+        start = first_day_of_month()
+        return start, last_day_of_month(start), False
 
-    return first_day_of_month(), None, False
+    start = first_day_of_month()
+    return start, last_day_of_month(start), False
 
 
 @bp.route("/")
@@ -72,9 +79,10 @@ def dashboard():
 
     date_from, date_to, explicit_range = _dashboard_dates()
     if date_from and date_to and date_from > date_to:
-        date_from, date_to = date_to, date_from
+        date_to = last_day_of_month(date_from)
     using_range = explicit_range and (date_from is not None or date_to is not None)
     date_from_raw = date_from.isoformat() if date_from else ""
+    date_from_month = date_from.strftime("%Y-%m") if date_from else ""
     date_to_raw = date_to.isoformat() if date_to else ""
 
     with get_session() as session:
@@ -99,6 +107,7 @@ def dashboard():
         )
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
+        tags_json = list_tag_payloads(session)
 
     filter_period: dict[str, str] = {"view": current_view}
     if date_from_raw:
@@ -119,12 +128,14 @@ def dashboard():
         month="all",
         months=months,
         date_from=date_from_raw,
+        date_from_month=date_from_month,
         date_to=date_to_raw,
         using_range=using_range,
         filter_period=nav_period,
         summary=summary,
         categories=cats_json,
         rules=rules_json,
+        tags=tags_json,
         cat_sort=sort_mode,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),

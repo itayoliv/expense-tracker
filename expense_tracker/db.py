@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from expense_tracker.models import Base, Category
+from expense_tracker.models import Base, Category, Tag  # noqa: F401 — Tag registers M2M tables
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 ROOT = PACKAGE_DIR.parent

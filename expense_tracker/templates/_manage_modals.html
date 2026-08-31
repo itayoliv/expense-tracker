@@ -78,23 +78,11 @@
         <button type="button" class="btn primary" id="btn-add-rule">{{ t('add_rule') }}</button>
       </div>
       <input type="search" id="rules-search" placeholder="{{ t('search_rules') }}" autocomplete="off">
-      <div id="rules-list" class="categories-list">
+      <div id="rules-list" class="categories-list rules-grouped-list">
         {% if not rules %}
           <div class="categories-empty">{{ t('no_rules') }}</div>
         {% else %}
-          {% for r in rules %}
-          <div class="cat-manage-row" data-id="{{ r.id }}">
-            <span class="cat-manage-swatch" style="background:{{ r.category_color }}"></span>
-            <div class="cat-manage-meta">
-              <span class="cat-manage-name">{{ r.display_name }}</span>
-              <span class="cat-manage-kind">{{ r.category_name }}{% if r.pattern != r.display_name %} · {{ r.pattern }}{% endif %}</span>
-            </div>
-            <div class="cat-manage-actions">
-              <button type="button" class="btn ghost btn-rule-edit" data-id="{{ r.id }}">{{ t('edit') }}</button>
-              <button type="button" class="btn ghost danger btn-rule-delete" data-id="{{ r.id }}">{{ t('delete') }}</button>
-            </div>
-          </div>
-          {% endfor %}
+          <div class="categories-empty">{{ t('search_rules') }}…</div>
         {% endif %}
       </div>
       <div class="modal-actions">
@@ -130,6 +118,48 @@
       </label>
       <div class="modal-actions">
         <button type="button" class="btn ghost" id="btn-rule-form-cancel">{{ t('cancel') }}</button>
+        <button type="submit" class="btn primary">{{ t('save') }}</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Manage tags modal -->
+<dialog id="tags-modal" class="modal modal-wide">
+  <div class="modal-form tags-manager">
+    <div id="tag-list-panel">
+      <div class="categories-header">
+        <h3>{{ t('tags_title') }}</h3>
+        <button type="button" class="btn primary" id="btn-add-tag">{{ t('add_tag') }}</button>
+      </div>
+      <div id="tags-list" class="categories-list tags-grouped-list">
+        {% if not tags %}
+          <div class="categories-empty">{{ t('no_tags') }}</div>
+        {% else %}
+          <div class="categories-empty">{{ t('tags_title') }}…</div>
+        {% endif %}
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>
+      </div>
+    </div>
+
+    <form id="tag-form" class="category-form-panel hidden">
+      <h3 id="tag-modal-title">{{ t('add_tag') }}</h3>
+      <input type="hidden" id="tag-id">
+      <label>
+        {{ t('tag_name') }}
+        <input type="text" id="tag-name" required maxlength="128">
+      </label>
+      <label class="color-field">
+        {{ t('color') }}
+        <div class="color-row">
+          <input type="color" id="tag-color" value="#6B7280">
+          <input type="text" id="tag-color-hex" value="#6B7280" maxlength="7" pattern="#[0-9A-Fa-f]{6}">
+        </div>
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="btn ghost" id="btn-tag-form-cancel">{{ t('cancel') }}</button>
         <button type="submit" class="btn primary">{{ t('save') }}</button>
       </div>
     </form>

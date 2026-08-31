@@ -3,7 +3,10 @@
 {% block body %}
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand">{{ t('app_title') }}</div>
+    <div class="brand-block">
+      <div class="brand">Expense Tracker</div>
+      <div class="app-version">v{{ app_version }}</div>
+    </div>
     <nav class="nav">
       <div class="nav-section">
         <div class="nav-label">{{ t('nav_snapshot') }}</div>
@@ -18,6 +21,7 @@
       <div class="nav-section">
         <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-tags">{{ t('manage_tags') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
       </div>
       <div class="nav-section muted">
@@ -45,14 +49,13 @@
           {% elif view == 'income' %}{{ t('income') }}
           {% else %}{{ t('bottom_line') }}{% endif %}
         </h1>
-        <div class="app-version">v{{ app_version }}</div>
         <form class="period-form" method="get" action="{{ url_for('pages.dashboard') }}" id="period-form">
           <input type="hidden" name="view" value="{{ view }}">
           <div class="period-range">
             <label for="date_from">{{ t('date_from') }}</label>
-            <input type="date" name="date_from" id="date_from" value="{{ date_from }}">
+            <input type="month" name="date_from" id="date_from" value="{{ date_from_month }}">
             <label for="date_to">{{ t('date_to') }}</label>
-            <input type="date" name="date_to" id="date_to" value="{{ date_to }}">
+            <input type="date" name="date_to" id="date_to" value="{{ date_to }}"{% if date_from %} min="{{ date_from }}"{% endif %}>
             <button type="submit" class="btn ghost" id="btn-apply-range">{{ t('apply_range') }}</button>
           </div>
         </form>
@@ -83,11 +86,18 @@
       <input type="search" id="unsorted-search" class="unsorted-search" placeholder="{{ t('search_unsorted') }}" autocomplete="off">
       <div class="unsorted-list">
         {% for u in summary.unsorted %}
-        <div class="unsorted-item" data-id="{{ u.id }}" data-date="{{ u.date }}" data-desc="{{ u.description }}" data-details="{{ u.details or '' }}" data-custom-desc="{{ u.custom_description or '' }}" data-amount="{{ '%.2f'|format(u.amount) }}">
+        <div class="unsorted-item" data-id="{{ u.id }}" data-date="{{ u.date }}" data-desc="{{ u.description }}" data-details="{{ u.details or '' }}" data-custom-desc="{{ u.custom_description or '' }}" data-amount="{{ '%.2f'|format(u.amount) }}" data-tags="{{ u.tags|map(attribute='id')|join(',') }}">
           <div class="u-meta">
             <span class="u-date">{{ u.date }}</span>
             {% if u.custom_description %}<span class="u-custom-desc">{{ u.custom_description }}</span>{% endif %}
             <span class="u-desc">{{ u.description }}</span>
+            {% if u.tags %}
+            <span class="tx-tags">
+              {% for tag in u.tags %}
+                <span class="tag-chip" style="--tag-color: {{ tag.color }}">{{ tag.name }}</span>
+              {% endfor %}
+            </span>
+            {% endif %}
             {% if u.details %}<span class="u-details">{{ u.details }}</span>{% endif %}
             <span class="u-source">
               <span class="source-badge source-{{ u.source }}">{{ u.source_label }}</span>
@@ -100,6 +110,15 @@
               <span class="u-custom-desc-label">{{ t('custom_description') }}</span>
               <input type="text" class="u-custom-desc-input" value="{{ u.custom_description or '' }}" placeholder="{{ t('custom_description') }}" autocomplete="off">
             </label>
+            <div class="tag-picker u-tag-picker" data-selected="{{ u.tags|map(attribute='id')|join(',') }}">
+              <span class="tag-picker-label">{{ t('tags') }}</span>
+              <div class="tag-picker-chips">
+                {% set selected_tag_ids = u.tags|map(attribute='id')|list %}
+                {% for tag in tags %}
+                <button type="button" class="tag-chip tag-chip-toggle{% if tag.id in selected_tag_ids %} selected{% endif %}" data-tag-id="{{ tag.id }}" style="--tag-color: {{ tag.color }}">{{ tag.name }}</button>
+                {% endfor %}
+              </div>
+            </div>
             <select class="u-cat-select" data-txn-id="{{ u.id }}">
               <option value="">{{ t('choose_category') }}</option>
               {% for c in categories if c.kind == 'expense' %}
@@ -186,6 +205,11 @@
 
       <section class="table-panel">
         <div class="table-panel-header">
+          <div class="tag-sum" id="global-tag-sum" data-scope="global">
+            <span class="tag-sum-label">{{ t('sum_tags') }}</span>
+            <div class="tag-sum-chips"></div>
+            <div class="tag-sum-result" hidden></div>
+          </div>
           <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
             {% if cat_sort == 'custom' %}{{ t('sort_categories_custom') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
           </button>
@@ -217,6 +241,11 @@
             </tr>
             <tr class="detail-row hidden" data-cat-detail="{{ cat.key }}">
               <td colspan="4">
+                <div class="tag-sum cat-tag-sum" data-scope="category" data-cat="{{ cat.key }}">
+                  <span class="tag-sum-label">{{ t('sum_tags') }}</span>
+                  <div class="tag-sum-chips"></div>
+                  <div class="tag-sum-result" hidden></div>
+                </div>
                 <table class="txn-table">
                   <thead>
                     <tr>
@@ -230,6 +259,8 @@
                   <tbody>
                     {% for tx in cat.txns %}
                     <tr data-txn-id="{{ tx.id }}"
+                        data-tags="{{ tx.tags|map(attribute='id')|join(',') }}"
+                        data-amount="{{ '%.2f'|format(tx.amount) }}"
                         {% if tx.split_group %}
                         class="txn-split-part"
                         data-split-group="{{ tx.split_group }}"
@@ -248,6 +279,13 @@
                             <span class="gpt-badge">{{ t('gpt_tag') }}</span>
                           {% endif %}
                         </div>
+                        {% if tx.tags %}
+                        <div class="tx-tags">
+                          {% for tag in tx.tags %}
+                            <span class="tag-chip" style="--tag-color: {{ tag.color }}">{{ tag.name }}</span>
+                          {% endfor %}
+                        </div>
+                        {% endif %}
                         {% if tx.details %}<div class="tx-details">{{ tx.details }}</div>{% endif %}
                       </td>
                       <td>{{ tx.date }}</td>
@@ -269,7 +307,9 @@
                           "date": tx.date,
                           "amount": tx.amount,
                           "category_id": tx.category_id,
-                          "direction": tx.direction
+                          "direction": tx.direction,
+                          "split_group": tx.split_group,
+                          "tag_ids": tx.tags|map(attribute="id")|list
                         }|tojson }}'>✎</button>
                       </td>
                     </tr>
@@ -357,6 +397,14 @@
           {% endfor %}
         </select>
       </label>
+      <div class="tag-picker" id="txn-tag-picker">
+        <span class="tag-picker-label">{{ t('tags') }}</span>
+        <div class="tag-picker-chips" id="txn-tag-chips">
+          {% for tag in tags %}
+          <button type="button" class="tag-chip tag-chip-toggle" data-tag-id="{{ tag.id }}" style="--tag-color: {{ tag.color }}">{{ tag.name }}</button>
+          {% endfor %}
+        </div>
+      </div>
     </div>
     <div id="txn-split-panel" class="txn-split-panel hidden">
       <p class="txn-split-hint">{{ t('split_hint') }}</p>

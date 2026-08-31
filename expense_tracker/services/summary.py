@@ -7,7 +7,7 @@ from datetime import date
 from typing import Any
 
 from sqlalchemy import extract, func, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
 from expense_tracker.models import Transaction
@@ -35,6 +35,18 @@ def parse_iso_date(raw: str | None) -> date | None:
     except ValueError:
         return None
 
+
+def parse_date_from_arg(raw: str | None) -> date | None:
+    """Accept YYYY-MM-DD or YYYY-MM (month picker → first day)."""
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if len(text) == 7 and text[4] == "-":
+        parsed = parse_month(text)
+        if parsed:
+            y, m = parsed
+            return date(y, m, 1)
+    return parse_iso_date(text)
 
 def current_month_key() -> str:
     today = date.today()
@@ -156,6 +168,13 @@ def split_accent(split_group: str) -> dict[str, str]:
 
 
 def serialize_txn(lang: str, x) -> dict[str, Any]:
+    tags = [
+        {"id": tag.id, "name": tag.name, "color": tag.color}
+        for tag in sorted(
+            getattr(x, "tags", None) or [],
+            key=lambda t: (t.name or "").casefold(),
+        )
+    ]
     return {
         "id": x.id,
         "description": x.description,
@@ -166,6 +185,7 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "direction": x.direction,
         "category_id": x.category_id,
         "categorized_by": x.categorized_by or "",
+        "tags": tags,
         **split_accent(getattr(x, "split_group", "") or ""),
         **txn_source_fields(lang, x),
     }
@@ -194,7 +214,10 @@ def build_summary(
     date_to: date | None = None,
     cat_sort: str = "alpha",
 ) -> dict:
-    base = select(Transaction).options(joinedload(Transaction.category))
+    base = select(Transaction).options(
+        joinedload(Transaction.category),
+        selectinload(Transaction.tags),
+    )
     start, end = resolve_date_range(date_from, date_to)
     if start or end:
         base = date_range_filter(base, start, end)

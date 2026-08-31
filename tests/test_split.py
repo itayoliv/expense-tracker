@@ -137,6 +137,68 @@ def test_split_amounts_must_match(client):
         assert session.get(Transaction, tid) is not None
 
 
+def test_already_split_cannot_split_again(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    tid = _add_txn(client, "PARENT", 50)
+    first = client.patch(
+        f"/transactions/{tid}",
+        json={
+            "splits": [
+                {"description": "Part A", "amount": 20, "category_id": shopping_id},
+                {"description": "Part B", "amount": 30, "category_id": shopping_id},
+            ]
+        },
+    )
+    assert first.status_code == 200
+    child_id = first.get_json()["created_ids"][0]
+    second = client.patch(
+        f"/transactions/{child_id}",
+        json={
+            "splits": [
+                {"description": "X", "amount": 10, "category_id": shopping_id},
+                {"description": "Y", "amount": 10, "category_id": shopping_id},
+            ]
+        },
+    )
+    assert second.status_code == 400
+    assert "already split" in (second.get_json().get("error") or "").lower()
+
+
+def test_split_saves_custom_description(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    tid = _add_txn(client, "PARENT", 50)
+    res = client.patch(
+        f"/transactions/{tid}",
+        json={
+            "splits": [
+                {
+                    "description": "Part A",
+                    "custom_description": "Tickets",
+                    "amount": 20,
+                    "category_id": shopping_id,
+                },
+                {
+                    "description": "Part B",
+                    "custom_description": "Parking",
+                    "amount": 30,
+                    "category_id": shopping_id,
+                },
+            ]
+        },
+    )
+    assert res.status_code == 200
+    ids = res.get_json()["created_ids"]
+    with db.get_session() as session:
+        parts = {
+            p.description: p
+            for p in session.scalars(
+                select(Transaction).where(Transaction.id.in_(ids))
+            ).all()
+        }
+        assert parts["Part A"].custom_description == "Tickets"
+        assert parts["Part B"].custom_description == "Parking"
+
+
 def test_split_remember_and_apply_per_description(client):
     fuel_id = _id_by_name_en(client, "Fuel and transport")
     shopping_id = _id_by_name_en(client, "Shopping")
