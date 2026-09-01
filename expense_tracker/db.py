@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import shutil
+from datetime import datetime
 from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, select
@@ -39,6 +41,7 @@ except ImportError:
 
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
+MAX_MIGRATION_BACKUPS = 5
 
 engine = None
 SessionLocal = None
@@ -248,6 +251,73 @@ def _table_columns(table: str) -> set[str]:
     return {c["name"] for c in insp.get_columns(table)}
 
 
+def _schema_migration_pending() -> bool:
+    """True when init_db would change an existing SQLite schema."""
+    if _has_legacy_schema():
+        return True
+    if engine is None or not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
+        return False
+    insp = inspect(engine)
+    existing_tables = set(insp.get_table_names())
+    for table_name in Base.metadata.tables:
+        if table_name not in existing_tables:
+            return True
+    rule_cols = _table_columns("categorization_rules")
+    if rule_cols and "name" not in rule_cols:
+        return True
+    txn_cols = _table_columns("transactions")
+    if txn_cols:
+        for col in ("source", "categorized_by", "custom_description", "split_group"):
+            if col not in txn_cols:
+                return True
+    return False
+
+
+def _copy_db_file(src: Path, dest: Path) -> None:
+    """Copy a SQLite file and any WAL/SHM sidecars."""
+    shutil.copy2(src, dest)
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(f"{src}{suffix}")
+        if sidecar.exists():
+            shutil.copy2(sidecar, Path(f"{dest}{suffix}"))
+
+
+def _backup_dir() -> Path:
+    return DB_PATH.parent / "backups"
+
+
+def _prune_migration_backups(max_keep: int = MAX_MIGRATION_BACKUPS) -> None:
+    backup_dir = _backup_dir()
+    if not backup_dir.exists():
+        return
+    backups = sorted(
+        backup_dir.glob("expenses-*.db"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old in backups[max_keep:]:
+        old.unlink(missing_ok=True)
+        for suffix in ("-wal", "-shm"):
+            Path(f"{old}{suffix}").unlink(missing_ok=True)
+
+
+def _backup_db_before_migration() -> Path | None:
+    """Snapshot expenses.db before schema changes; keep the last few copies."""
+    if not _schema_migration_pending():
+        return None
+    if engine is None or not DB_PATH.exists() or DB_PATH.stat().st_size == 0:
+        return None
+    from expense_tracker import __version__
+
+    backup_dir = _backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dest = backup_dir / f"expenses-{__version__}-{stamp}.db"
+    _copy_db_file(DB_PATH, dest)
+    _prune_migration_backups()
+    return dest
+
+
 def _migrate_schema() -> None:
     """Add columns that create_all will not attach to an existing SQLite file."""
     if engine is None:
@@ -344,6 +414,7 @@ def _backfill_split_groups() -> None:
 
 
 def init_db() -> None:
+    _backup_db_before_migration()
     if _has_legacy_schema():
         _wipe_db_file()
     Base.metadata.create_all(engine)

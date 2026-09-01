@@ -17,6 +17,39 @@ Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX 
 
 Optional: edit `expense_tracker/.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
 
+## Upgrading
+
+Your data lives in `data/` (especially `data/expenses.db`) and settings in `expense_tracker/.env`. App code can be replaced; those folders should be kept.
+
+**What to keep when upgrading**
+
+| Keep | Do not copy |
+|------|-------------|
+| `data/` (database, Yahoo session, caches) | `.venv/` (machine-specific; recreate with `install.bat`) |
+| `expense_tracker/.env` | |
+
+**Zip install → newer zip**
+
+1. Download or unzip the **new** version into a new folder.
+2. Double-click **`upgrade.bat`** in the new folder.
+3. Enter (or drag in) the path to your **old** install when prompted.
+4. The script copies `data/` and `.env` from the old folder, sets up `.venv`, and leaves the old folder untouched.
+5. Double-click **`run.bat`**. On first start the database migrates automatically (new tables/columns are added in place).
+
+**Git repo**
+
+```bash
+git pull
+install.bat
+run.bat
+```
+
+Your existing `data/` and `expense_tracker/.env` stay in place; `install.bat` only refreshes dependencies.
+
+**Automatic backups**
+
+Before any schema migration, the app copies `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` (keeps the last 5). `upgrade.bat` also saves a full `data/` snapshot under `data/backups/pre-upgrade-<timestamp>/` before importing from the old install.
+
 ## Versioning
 
 This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2** (see [CHANGELOG.md](CHANGELOG.md)).
@@ -78,7 +111,7 @@ Credit-card files are imported as **one expense per merchant**. When card detail
   - `services/` — summary and API payload helpers
   - `templates/`, `static/`, `locales/` — UI and translations
 - `data/` — SQLite DB, Yahoo session profile, and caches (gitignored)
-- `install.bat` / `run.bat` / `connect_yahoo.bat` — Windows install, launch, and Yahoo login
+- `install.bat` / `run.bat` / `upgrade.bat` / `connect_yahoo.bat` — Windows install, launch, upgrade, and Yahoo login
 
 Personal bank exports under `files/`, the SQLite DB under `data/`, Yahoo session files, and `expense_tracker/.env` are gitignored and should not be committed.
 

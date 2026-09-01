@@ -18,7 +18,16 @@ if errorlevel 1 (
 )
 
 echo [1/4] Creating virtual environment (.venv)...
-if not exist ".venv\Scripts\python.exe" (
+set "VENV_OK=0"
+if exist ".venv\Scripts\python.exe" (
+    ".venv\Scripts\python.exe" --version >nul 2>&1
+    if not errorlevel 1 set "VENV_OK=1"
+)
+if "%VENV_OK%"=="0" (
+    if exist ".venv" (
+        echo       Existing .venv is missing or broken ^(e.g. copied from another PC^) — recreating.
+        rmdir /s /q ".venv"
+    )
     python -m venv .venv
     if errorlevel 1 (
         echo ERROR: Failed to create virtual environment.
