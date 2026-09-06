@@ -46,7 +46,7 @@ def test_seed_defaults_does_not_add_rules(client):
 
 
 def test_import_does_not_auto_categorize(client):
-    from expense_tracker.importer import import_file
+    from expense_tracker.services.importer import import_file
     from tests.test_importer import _isracard_bytes
 
     with db.get_session() as session:
@@ -59,7 +59,7 @@ def test_import_does_not_auto_categorize(client):
 
 
 def test_credits_stay_unsorted_without_rule():
-    from expense_tracker.categorizer import match_category_id
+    from expense_tracker.services.categorizer import match_category_id
     from expense_tracker.models import Category
 
     cats = {

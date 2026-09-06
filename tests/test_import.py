@@ -286,7 +286,7 @@ def test_unsorted_banner_shows_details_newest_first(client):
     assert "01/08/26" in html
     assert "recurring" in html
     assert "installment 1" in html
-    js = client.get("/static/js/transactions.js").get_data(as_text=True)
+    js = client.get("/static/js/transactions-banner.js").get_data(as_text=True)
     assert "unsorted-search" in js
 
 
@@ -294,7 +294,7 @@ def test_dashboard_shows_source_badges(client):
     from sqlalchemy import select
 
     import expense_tracker.db as db
-    from expense_tracker.importer import import_file
+    from expense_tracker.services.importer import import_file
     from expense_tracker.models import Transaction
     from tests.test_importer import _bank_csv_bytes, _isracard_bytes
 

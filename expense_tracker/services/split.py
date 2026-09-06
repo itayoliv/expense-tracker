@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from expense_tracker.categorizer import apply_description, remember_rule
+from expense_tracker.services.categorizer import apply_description, remember_rule
 from expense_tracker.models import Category, Transaction
 
 

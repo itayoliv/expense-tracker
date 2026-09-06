@@ -15,10 +15,10 @@ if "%VENV_OK%"=="0" (
     exit /b 1
 )
 
-if not exist "expense_tracker\.env" (
-    if exist "expense_tracker\.env.example" (
-        copy /Y "expense_tracker\.env.example" "expense_tracker\.env" >nul
-        echo Created expense_tracker\.env from .env.example
+if not exist ".env" (
+    if exist ".env.example" (
+        copy /Y ".env.example" ".env" >nul
+        echo Created .env from .env.example
     )
 )
 

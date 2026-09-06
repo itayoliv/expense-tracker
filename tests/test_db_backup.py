@@ -1,4 +1,4 @@
-"""Tests for pre-migration database backups."""
+"""Tests for pre-migration and manual database backups."""
 
 from __future__ import annotations
 
@@ -103,6 +103,39 @@ def test_prune_migration_backups_keeps_last_five(tmp_path, monkeypatch):
     db._prune_migration_backups()
     remaining = sorted(backup_root.glob("expenses-*.db"), key=lambda p: p.name)
     assert len(remaining) == 5
+
+
+def test_create_db_backup_manual_prunes_to_five(tmp_path, monkeypatch):
+    path = tmp_path / "expenses.db"
+    db.configure_engine(path)
+    db.init_db()
+    monkeypatch.setattr(db, "MAX_MIGRATION_BACKUPS", 5)
+    backup_root = path.parent / "backups"
+
+    for _ in range(6):
+        dest = db.create_db_backup(label="manual")
+        assert dest.exists()
+        assert dest.name.startswith("expenses-manual-")
+
+    backups = list(backup_root.glob("expenses-*.db"))
+    assert len(backups) == 5
+
+
+def test_settings_backup_endpoint(client, tmp_path):
+    res = client.post("/api/settings/backup")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["ok"] is True
+    assert data["filename"].startswith("expenses-manual-")
+    assert (tmp_path / "backups" / data["filename"]).exists()
+
+
+def test_settings_backup_missing_db(tmp_path, client):
+    missing = tmp_path / "gone" / "expenses.db"
+    db.configure_engine(missing)
+    res = client.post("/api/settings/backup")
+    assert res.status_code == 400
+    assert res.get_json()["ok"] is False
 
 
 def test_schema_migration_pending_detects_missing_column(tmp_path):

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from expense_tracker import db
-from expense_tracker.gpt_sort import GPT_MODEL, get_api_key
+from expense_tracker.integrations.gpt_sort import GPT_MODEL, get_api_key
 
 SECTOR_UNKNOWN = "unknown"
 SECTOR_ETF = "etf_diversified"

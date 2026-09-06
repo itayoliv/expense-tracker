@@ -9,9 +9,9 @@ from sqlalchemy import select
 from werkzeug.utils import secure_filename
 
 from expense_tracker.db import get_session
-from expense_tracker.gpt_sort import has_api_key
+from expense_tracker.integrations.gpt_sort import has_api_key
 from expense_tracker.i18n import html_dir, t
-from expense_tracker.importer import import_file
+from expense_tracker.services.importer import import_file
 from expense_tracker.models import Category
 from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories, view
 from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads

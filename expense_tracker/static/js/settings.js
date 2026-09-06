@@ -8,12 +8,34 @@
   const settingsModal = document.getElementById("settings-modal");
   const btnSettings = document.getElementById("btn-settings");
   const btnSeedCategories = document.getElementById("btn-seed-categories");
+  const btnBackupDb = document.getElementById("btn-backup-db");
   const btnClearTransactions = document.getElementById("btn-clear-transactions");
   const btnResetRules = document.getElementById("btn-reset-rules");
   const settingShowPie = document.getElementById("setting-show-pie");
 
   if (btnSettings) {
     btnSettings.addEventListener("click", () => openModal(settingsModal));
+  }
+
+  if (btnBackupDb) {
+    btnBackupDb.addEventListener("click", async () => {
+      btnBackupDb.disabled = true;
+      try {
+        const res = await fetch("/api/settings/backup", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          alert(data.error || "Error");
+          return;
+        }
+        alert(
+          data.message ||
+            (APP.strings && APP.strings.backup_db_success) ||
+            "Backup saved."
+        );
+      } finally {
+        btnBackupDb.disabled = false;
+      }
+    });
   }
 
   if (btnSeedCategories) {

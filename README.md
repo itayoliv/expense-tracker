@@ -10,23 +10,23 @@ Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX 
 ## Quick start (Windows)
 
 1. **First time only** — double-click `install.bat`  
-   Creates `.venv`, installs dependencies, and copies `expense_tracker/.env.example` → `expense_tracker/.env` if needed.
+   Creates `.venv`, installs dependencies, and copies `.env.example` → `.env` if needed.
 2. **Every time** — double-click `run.bat`  
    Starts the server and opens [http://127.0.0.1:5000](http://127.0.0.1:5000).
 3. Press **Ctrl+C** in the console window to stop the server.
 
-Optional: edit `expense_tracker/.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
+Optional: edit `.env` (or use **Settings** in the app) to set an OpenAI API key for “Sort with ChatGPT”.
 
 ## Upgrading
 
-Your data lives in `data/` (especially `data/expenses.db`) and settings in `expense_tracker/.env`. App code can be replaced; those folders should be kept.
+Your data lives in `data/` (especially `data/expenses.db`) and settings in `.env`. App code can be replaced; those folders should be kept.
 
 **What to keep when upgrading**
 
 | Keep | Do not copy |
 |------|-------------|
 | `data/` (database, Yahoo session, caches) | `.venv/` (machine-specific; recreate with `install.bat`) |
-| `expense_tracker/.env` | |
+| `.env` | |
 
 **Zip install → newer zip**
 
@@ -44,11 +44,11 @@ install.bat
 run.bat
 ```
 
-Your existing `data/` and `expense_tracker/.env` stay in place; `install.bat` only refreshes dependencies.
+Your existing `data/` and `.env` stay in place; `install.bat` only refreshes dependencies.
 
 **Automatic backups**
 
-Before any schema migration, the app copies `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` (keeps the last 5). `upgrade.bat` also saves a full `data/` snapshot under `data/backups/pre-upgrade-<timestamp>/` before importing from the old install.
+Before any schema migration, the app copies `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` (keeps the last 5 `expenses-*.db` files). You can also create a backup anytime from **Settings → Back up database** (`expenses-manual-<timestamp>.db`). `upgrade.bat` also saves a full `data/` snapshot under `data/backups/pre-upgrade-<timestamp>/` before importing from the old install.
 
 ## Versioning
 
@@ -76,7 +76,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 REM Optional: python -m playwright install chromium
-copy expense_tracker\.env.example expense_tracker\.env
+copy .env.example .env
 python -m expense_tracker
 ```
 
@@ -102,18 +102,19 @@ Credit-card files are imported as **one expense per merchant**. When card detail
 
 ## Project layout
 
+- `.env` / `.env.example` — local config at project root (`.env` is gitignored; legacy `expense_tracker/.env` still loaded if present)
 - `expense_tracker/` — application package (run with `python -m expense_tracker`)
   - `__main__.py` — server entrypoint
-  - `.env` / `.env.example` — local config (`.env` is gitignored)
-  - `yahoo_finance.py` — Yahoo session connect + portfolio fetch
-  - `db.py`, `models.py`, `importer.py`, `categorizer.py`, `gpt_sort.py`, `i18n.py`
-  - `routes/` — HTTP blueprints (including `investments`)
-  - `services/` — summary and API payload helpers
-  - `templates/`, `static/`, `locales/` — UI and translations
+  - `models.py`, `i18n.py`
+  - `db/` — engine, migrations, seeds, backups
+  - `integrations/` — external services (`gpt_sort.py`, `yahoo/` for Yahoo Finance session + portfolios)
+  - `services/` — domain logic (`categorizer`, `importer/`, `investment_sectors`, summary/split/payloads)
+  - `routes/` — HTTP blueprints
+  - `templates/`, `static/` (including split `transactions-*.js` files), `locales/` — UI and translations
 - `data/` — SQLite DB, Yahoo session profile, and caches (gitignored)
 - `install.bat` / `run.bat` / `upgrade.bat` / `connect_yahoo.bat` — Windows install, launch, upgrade, and Yahoo login
 
-Personal bank exports under `files/`, the SQLite DB under `data/`, Yahoo session files, and `expense_tracker/.env` are gitignored and should not be committed.
+Personal bank exports under `files/`, the SQLite DB under `data/`, Yahoo session files, and `.env` are gitignored and should not be committed.
 
 ## Data
 

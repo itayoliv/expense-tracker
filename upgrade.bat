@@ -63,10 +63,13 @@ if errorlevel 1 (
 )
 echo       Copied data\ from old install.
 
-echo [3/5] Copying expense_tracker\.env from old install ^(if present^)...
-if exist "!OLD_DIR!\expense_tracker\.env" (
-    copy /Y "!OLD_DIR!\expense_tracker\.env" "expense_tracker\.env" >nul
-    echo       Copied expense_tracker\.env.
+echo [3/5] Copying .env from old install ^(if present^)...
+if exist "!OLD_DIR!\.env" (
+    copy /Y "!OLD_DIR!\.env" ".env" >nul
+    echo       Copied .env ^(root^).
+) else if exist "!OLD_DIR!\expense_tracker\.env" (
+    copy /Y "!OLD_DIR!\expense_tracker\.env" ".env" >nul
+    echo       Copied .env ^(legacy expense_tracker\.env^).
 ) else (
     echo       No .env in old install — keeping current or .env.example.
 )

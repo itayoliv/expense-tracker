@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from expense_tracker.investment_sectors import (
+from expense_tracker.services.investment_sectors import (
     SECTOR_ETF,
     SECTOR_UNKNOWN,
     VALID_SECTOR_IDS,
@@ -88,7 +88,7 @@ def test_parse_gpt_sector_response_validates_sectors():
 
 def test_assignments_persist_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "expense_tracker.investment_sectors.sectors_path",
+        "expense_tracker.services.investment_sectors.sectors_path",
         lambda: tmp_path / "investment_sectors.json",
     )
     save_assignments(
@@ -123,11 +123,11 @@ def test_symbols_needing_classification_only_new_symbols():
 
 def test_classify_symbols_uses_gpt_and_persists(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "expense_tracker.investment_sectors.sectors_path",
+        "expense_tracker.services.investment_sectors.sectors_path",
         lambda: tmp_path / "investment_sectors.json",
     )
     monkeypatch.setattr(
-        "expense_tracker.investment_sectors.get_api_key",
+        "expense_tracker.services.investment_sectors.get_api_key",
         lambda: "test-key",
     )
 
@@ -153,11 +153,11 @@ def test_classify_symbols_uses_gpt_and_persists(tmp_path, monkeypatch):
 
 def test_classify_symbols_unknown_fallback(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "expense_tracker.investment_sectors.sectors_path",
+        "expense_tracker.services.investment_sectors.sectors_path",
         lambda: tmp_path / "investment_sectors.json",
     )
     monkeypatch.setattr(
-        "expense_tracker.investment_sectors.get_api_key",
+        "expense_tracker.services.investment_sectors.get_api_key",
         lambda: "test-key",
     )
 
@@ -171,7 +171,7 @@ def test_classify_symbols_unknown_fallback(tmp_path, monkeypatch):
 
 
 def test_classify_portfolio_symbols_skips_without_api_key(monkeypatch):
-    monkeypatch.setattr("expense_tracker.investment_sectors.get_api_key", lambda: None)
+    monkeypatch.setattr("expense_tracker.services.investment_sectors.get_api_key", lambda: None)
     result = classify_portfolio_symbols(PORTFOLIOS)
     assert result["classified"] == 0
     assert result["skipped"] == 3

@@ -8,9 +8,9 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from sqlalchemy import select
 
 from expense_tracker.db import get_session
-from expense_tracker.gpt_sort import has_api_key
+from expense_tracker.integrations.gpt_sort import has_api_key
 from expense_tracker.i18n import html_dir, t
-from expense_tracker.investment_sectors import (
+from expense_tracker.services.investment_sectors import (
     aggregate_sector_allocation,
     classify_portfolio_symbols,
     count_unassigned_symbols,
@@ -18,7 +18,7 @@ from expense_tracker.investment_sectors import (
 from expense_tracker.models import Category
 from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories
 from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
-from expense_tracker.yahoo_finance import (
+from expense_tracker.integrations.yahoo import (
     YahooFinanceError,
     build_holdings_history,
     fetch_live_quotes,

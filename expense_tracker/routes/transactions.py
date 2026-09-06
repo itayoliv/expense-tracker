@@ -6,7 +6,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
-from expense_tracker.categorizer import (
+from expense_tracker.services.categorizer import (
     apply_to_similar_all,
     apply_to_similar_unsorted,
     categorize_transaction,

@@ -56,17 +56,17 @@ if errorlevel 1 (
     echo       Playwright Chromium installed as a fallback browser.
 )
 
-echo [4/4] Setting up expense_tracker\.env...
-if not exist "expense_tracker\.env" (
-    if exist "expense_tracker\.env.example" (
-        copy /Y "expense_tracker\.env.example" "expense_tracker\.env" >nul
-        echo       Created expense_tracker\.env from .env.example
-        echo       Edit expense_tracker\.env if you want an OpenAI API key.
+echo [4/4] Setting up .env...
+if not exist ".env" (
+    if exist ".env.example" (
+        copy /Y ".env.example" ".env" >nul
+        echo       Created .env from .env.example
+        echo       Edit .env if you want an OpenAI API key.
     ) else (
-        echo WARNING: expense_tracker\.env.example missing — skipped .env create.
+        echo WARNING: .env.example missing — skipped .env create.
     )
 ) else (
-    echo       expense_tracker\.env already exists — leaving it unchanged.
+    echo       .env already exists — leaving it unchanged.
 )
 
 if not exist "data" mkdir data

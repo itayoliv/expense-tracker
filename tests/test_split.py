@@ -251,6 +251,7 @@ def test_edit_modal_includes_split_controls(client):
     html = client.get("/").get_data(as_text=True)
     assert 'id="btn-split-toggle"' in html
     assert 'id="txn-split-panel"' in html
-    js = client.get("/static/js/transactions.js").get_data(as_text=True)
-    assert '"splits"' in js or "splits" in js
-    assert "splitMode" in js
+    split_js = client.get("/static/js/transactions-split.js").get_data(as_text=True)
+    edit_js = client.get("/static/js/transactions-edit.js").get_data(as_text=True)
+    assert "splitMode" in split_js
+    assert "splits" in edit_js

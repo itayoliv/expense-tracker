@@ -64,7 +64,7 @@ def test_investments_refresh_success(client, monkeypatch):
 
 
 def test_investments_refresh_error(client, monkeypatch):
-    from expense_tracker.yahoo_finance import YahooFinanceError
+    from expense_tracker.integrations.yahoo import YahooFinanceError
 
     def _boom():
         raise YahooFinanceError("Yahoo Finance is not connected. Run connect_yahoo.bat once to log in.")
@@ -119,7 +119,7 @@ def test_investments_quotes_endpoint(client, monkeypatch):
 
 
 def test_quote_from_yahoo_prefers_post_market():
-    from expense_tracker.yahoo_finance import _quote_from_yahoo_result
+    from expense_tracker.integrations.yahoo.quotes import _quote_from_yahoo_result
 
     q = _quote_from_yahoo_result(
         {
@@ -137,7 +137,7 @@ def test_quote_from_yahoo_prefers_post_market():
 
 
 def test_normalize_holding_recovers_qty_from_market_value():
-    from expense_tracker.yahoo_finance import _normalize_holding
+    from expense_tracker.integrations.yahoo.portfolios import _normalize_holding
 
     h = _normalize_holding(
         {
@@ -169,7 +169,7 @@ def test_normalize_holding_recovers_qty_from_market_value():
 
 
 def test_holding_from_dom_uses_shares_and_rejects_junk():
-    from expense_tracker.yahoo_finance import _holding_from_row
+    from expense_tracker.integrations.yahoo.portfolios import _holding_from_row
 
     good = _holding_from_row(
         {
@@ -200,7 +200,7 @@ def test_holding_from_dom_uses_shares_and_rejects_junk():
 
 
 def test_extract_ignores_bare_quotes():
-    from expense_tracker.yahoo_finance import _extract_holdings_from_payload
+    from expense_tracker.integrations.yahoo.portfolios import _extract_holdings_from_payload
 
     payload = {
         "quoteResponse": {
@@ -262,7 +262,7 @@ def test_investments_history_endpoint(client, monkeypatch):
 
 
 def test_fetch_usd_ils_rate_uses_yahoo_quote(monkeypatch):
-    from expense_tracker import yahoo_finance as yf
+    from expense_tracker.integrations.yahoo import quotes as yf
 
     monkeypatch.setattr(
         yf,

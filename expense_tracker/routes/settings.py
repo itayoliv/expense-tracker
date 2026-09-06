@@ -5,8 +5,8 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, request
 from sqlalchemy import delete, func, select
 
-from expense_tracker.db import get_session, seed_defaults
-from expense_tracker.gpt_sort import (
+from expense_tracker.db import create_db_backup, get_session, seed_defaults
+from expense_tracker.integrations.gpt_sort import (
     GptSortError,
     clear_api_key,
     save_api_key,
@@ -64,6 +64,27 @@ def reset_rules():
         else t(current_lang, "reset_rules_none")
     )
     return jsonify({"ok": True, "deleted": count, "message": message})
+
+
+@bp.route("/api/settings/backup", methods=["POST"])
+def backup_database():
+    current_lang = lang()
+    try:
+        dest = create_db_backup(label="manual")
+    except FileNotFoundError:
+        return jsonify(
+            {"ok": False, "error": t(current_lang, "backup_db_missing")}
+        ), 400
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "path": str(dest),
+            "filename": dest.name,
+            "message": t(current_lang, "backup_db_success", name=dest.name),
+        }
+    )
 
 
 @bp.route("/api/settings/openai-key", methods=["POST"])

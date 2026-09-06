@@ -7,7 +7,7 @@ from datetime import date
 
 import pandas as pd
 
-from expense_tracker.importer import parse_file
+from expense_tracker.services.importer import parse_file
 
 
 def _isracard_bytes() -> bytes:
@@ -93,7 +93,7 @@ def test_bank_statement_rows_are_marked_bank():
 
 
 def test_reimport_updates_billing_date(client, tmp_path):
-    from expense_tracker.importer import import_file
+    from expense_tracker.services.importer import import_file
     import expense_tracker.db as db
     from expense_tracker.models import Transaction
     from sqlalchemy import select
@@ -244,7 +244,7 @@ def test_discount_credit_card_parses_merchant_lines():
 
 
 def test_dashboard_month_uses_billing_date(client):
-    from expense_tracker.importer import import_file
+    from expense_tracker.services.importer import import_file
     import expense_tracker.db as db
 
     with db.get_session() as session:

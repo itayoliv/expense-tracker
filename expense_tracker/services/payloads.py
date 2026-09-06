@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy import select
 
-from expense_tracker.categorizer import category_map
+from expense_tracker.services.categorizer import category_map
 from expense_tracker.i18n import category_name
 from expense_tracker.models import CategorizationRule, Category, Tag
 

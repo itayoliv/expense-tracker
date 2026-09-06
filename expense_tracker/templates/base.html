@@ -89,6 +89,7 @@
         gpt_sort: {{ t('gpt_sort')|tojson }},
         openai_key_saved: {{ t('openai_key_saved')|tojson }},
         openai_key_cleared: {{ t('openai_key_cleared')|tojson }},
+        backup_db_success: {{ t('backup_db_success')|tojson }},
         sort_categories_alpha: {{ t('sort_categories_alpha')|tojson }},
         sort_categories_custom: {{ t('sort_categories_custom')|tojson }},
         drag_to_reorder: {{ t('drag_to_reorder')|tojson }}
@@ -99,6 +100,9 @@
   <script defer src="{{ url_for('static', filename='js/pie.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/import.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/transactions.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/transactions-edit.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/transactions-split.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/transactions-banner.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/categories.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/rules.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/tags.js') }}"></script>

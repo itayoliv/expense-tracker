@@ -29,7 +29,7 @@ echo.
 echo Your password is never stored — only a local browser session.
 echo.
 
-".venv\Scripts\python.exe" -m expense_tracker.yahoo_finance connect
+".venv\Scripts\python.exe" -m expense_tracker.integrations.yahoo connect
 set ERR=%ERRORLEVEL%
 
 echo.

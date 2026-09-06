@@ -17,7 +17,7 @@ def _no_real_openai(monkeypatch):
     def _blocked(*_args, **_kwargs):
         raise AssertionError("ask_openai must be mocked in tests")
 
-    monkeypatch.setattr("expense_tracker.gpt_sort.ask_openai", _blocked)
+    monkeypatch.setattr("expense_tracker.integrations.gpt_sort.ask_openai", _blocked)
 
 
 @pytest.fixture()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from expense_tracker.categorizer import category_map
+from expense_tracker.services.categorizer import category_map
 from expense_tracker.db import get_session
 from expense_tracker.i18n import t
 from expense_tracker.models import CategorizationRule

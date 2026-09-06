@@ -43,6 +43,25 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 - Add a **custom description** field for each split part.
 - Split part **description** is read-only and pre-filled from the original transaction.
 
+### Upgrading and data migration
+
+- Add **`upgrade.bat`** — one-click upgrade from an older install: copies `data/` and `.env` (root or legacy `expense_tracker/.env`), backs up any existing data in the new folder, sets up `.venv`, and installs dependencies. The old folder is left untouched. Works for any prior version (zip install → newer zip).
+- **Automatic DB backup before migration** — on startup, if a schema change is pending, copy `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` before `create_all` / column migrations (keeps the last 5). Also runs before the legacy-schema wipe so very old databases are not lost silently.
+- **Manual backup in Settings** — **Back up database** saves `data/backups/expenses-manual-<timestamp>.db`. Manual and migration snapshots share the same last-5 pool of `expenses-*.db` files.
+- **In-place schema migration** on first start after an upgrade: new tables via `create_all`, new columns via `_migrate_schema()` — no manual DB steps. Same path for git pull in an existing folder (`install.bat` then `run.bat`).
+- **`install.bat`**, **`run.bat`**, and **`connect_yahoo.bat`** detect a `.venv` copied from another PC and recreate it or show a clear message.
+- README **Upgrading** section: zip install (`upgrade.bat`) vs git (`git pull` + `install.bat`), what to keep (`data/`, `.env`) and what not to copy (`.venv`).
+- Tests in `tests/test_db_backup.py`.
+
+### Internal restructuring
+
+- Move `.env` / `.env.example` to the project root (legacy `expense_tracker/.env` still loaded if present).
+- Introduce `integrations/` (`gpt_sort`, `yahoo/`) and expand `services/` (`categorizer`, `importer/`, `investment_sectors`).
+- Split `db.py` into `db/` package (`seed`, `migrations`, `backups`).
+- Split Yahoo Finance into `integrations/yahoo/` (`session`, `portfolios`, `quotes`, `history`).
+- Split bank/card import into `services/importer/` (`common`, `hapoalim`, `isracard`, `discount`).
+- Split dashboard transaction JS into `transactions.js` + `transactions-edit.js` / `transactions-split.js` / `transactions-banner.js`.
+
 ---
 
 ## 0.4.2 - 2026-08-26
