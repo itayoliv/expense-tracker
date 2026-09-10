@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from expense_tracker.services.categorizer import category_map
 from expense_tracker.i18n import category_name
-from expense_tracker.models import CategorizationRule, Category, Tag
+from expense_tracker.models import CategorizationRule, Category, Tag, TagSumFormula
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
@@ -60,6 +60,26 @@ def list_tag_payloads(session) -> list[dict[str, Any]]:
             )
         )
     return payloads
+
+
+def tag_formula_payload(formula: TagSumFormula) -> dict[str, Any]:
+    return {
+        "id": formula.id,
+        "scope": formula.scope,
+        "tag_ids": [tag.id for tag in formula.tags],
+        "sort_order": formula.sort_order,
+    }
+
+
+def list_tag_formula_payloads(session) -> list[dict[str, Any]]:
+    formulas = session.scalars(
+        select(TagSumFormula).order_by(
+            TagSumFormula.scope,
+            TagSumFormula.sort_order,
+            TagSumFormula.id,
+        )
+    ).all()
+    return [tag_formula_payload(formula) for formula in formulas]
 
 
 def parse_tag_ids(payload: dict) -> list[int] | None:

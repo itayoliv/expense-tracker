@@ -5,9 +5,6 @@
       <div class="categories-header">
         <h3>{{ t('categories_title') }}</h3>
         <div class="categories-header-actions">
-          <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort-manage" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
-            {% if cat_sort == 'custom' %}{{ t('sort_categories_custom') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
-          </button>
           <button type="button" class="btn primary" id="btn-add-category">{{ t('add_category') }}</button>
         </div>
       </div>
@@ -16,8 +13,7 @@
           <div class="categories-empty">{{ t('no_categories') }}</div>
         {% else %}
           {% for c in categories %}
-          <div class="cat-manage-row" data-id="{{ c.id }}" draggable="true">
-            <span class="cat-drag-handle" title="{{ t('drag_to_reorder') }}" aria-hidden="true">⋮⋮</span>
+          <div class="cat-manage-row" data-id="{{ c.id }}">
             <span class="cat-manage-swatch" style="background:{{ c.color }}"></span>
             <div class="cat-manage-meta">
               <span class="cat-manage-name">{{ c.name }}</span>
@@ -132,7 +128,7 @@
         <h3>{{ t('tags_title') }}</h3>
         <button type="button" class="btn primary" id="btn-add-tag">{{ t('add_tag') }}</button>
       </div>
-      <div id="tags-list" class="categories-list tags-grouped-list">
+      <div id="tags-list" class="categories-list">
         {% if not tags %}
           <div class="categories-empty">{{ t('no_tags') }}</div>
         {% else %}
@@ -206,6 +202,10 @@
     <div class="settings-block settings-danger">
       <p class="settings-hint">{{ t('clear_transactions_hint') }}</p>
       <button type="button" class="btn danger" id="btn-clear-transactions">{{ t('clear_transactions') }}</button>
+    </div>
+    <div class="settings-block">
+      <p class="settings-hint">{{ t('shutdown_hint') }}</p>
+      <button type="button" class="btn secondary js-shutdown-app" id="btn-shutdown-app">{{ t('shutdown_app') }}</button>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>

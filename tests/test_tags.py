@@ -130,3 +130,129 @@ def test_dashboard_includes_tags(client):
     assert "Manage tags" in html or "ניהול תגיות" in html
     assert "Dash" in html
     assert f'data-tags="{tag_id}"' in html or f"data-tags='{tag_id}'" in html
+    assert 'class="tag-picker-chips"' in html
+    js = client.get("/static/js/transactions.js").get_data(as_text=True)
+    assert "tag-add-btn" in js
+    assert "tag-add-select" in js
+    assert "tag-chip-toggle" not in js
+    tags_js = client.get("/static/js/tags.js").get_data(as_text=True)
+    assert "tag-formula-add" in tags_js
+    assert "tag-add-select" in tags_js
+    assert "tag-add-btn" not in tags_js
+    assert "tag-chip-toggle" not in tags_js
+
+
+def test_tag_formula_crud_and_persistence(client):
+    tag_a = client.post("/api/tags", json={"name": "Formula A"}).get_json()["tag"]["id"]
+    tag_b = client.post("/api/tags", json={"name": "Formula B"}).get_json()["tag"]["id"]
+
+    created = client.post("/api/tag-formulas", json={"tag_ids": [tag_a]})
+    assert created.status_code == 200
+    formula = created.get_json()["formula"]
+    assert formula["tag_ids"] == [tag_a]
+    assert formula["scope"] == "global"
+    formula_id = formula["id"]
+
+    listed = client.get("/api/tag-formulas").get_json()
+    assert listed["ok"] is True
+    assert any(
+        item["id"] == formula_id and item["tag_ids"] == [tag_a]
+        for item in listed["formulas"]
+    )
+
+    updated = client.patch(
+        f"/api/tag-formulas/{formula_id}",
+        json={"tag_ids": [tag_a, tag_b]},
+    )
+    assert updated.status_code == 200
+    assert set(updated.get_json()["formula"]["tag_ids"]) == {tag_a, tag_b}
+
+    persisted = client.get("/api/tag-formulas").get_json()["formulas"]
+    saved = next(item for item in persisted if item["id"] == formula_id)
+    assert set(saved["tag_ids"]) == {tag_a, tag_b}
+
+    deleted = client.delete(f"/api/tag-formulas/{formula_id}")
+    assert deleted.status_code == 200
+    assert all(
+        item["id"] != formula_id
+        for item in client.get("/api/tag-formulas").get_json()["formulas"]
+    )
+
+
+def test_tag_formula_allows_empty_and_rejects_unknown_tag(client):
+    empty = client.post("/api/tag-formulas", json={"tag_ids": []})
+    assert empty.status_code == 200
+    formula_id = empty.get_json()["formula"]["id"]
+
+    rejected = client.patch(
+        f"/api/tag-formulas/{formula_id}",
+        json={"tag_ids": [999999]},
+    )
+    assert rejected.status_code == 400
+    assert rejected.get_json()["error"] == "Unknown tag id"
+    formulas = client.get("/api/tag-formulas").get_json()["formulas"]
+    assert next(item for item in formulas if item["id"] == formula_id)["tag_ids"] == []
+
+
+def test_tag_formulas_are_independent_per_category(client):
+    tag_id = client.post("/api/tags", json={"name": "Scoped"}).get_json()["tag"]["id"]
+    categories = client.get("/api/categories").get_json()["categories"]
+    category_a, category_b = categories[:2]
+
+    global_formula = client.post(
+        "/api/tag-formulas",
+        json={"scope": "global", "tag_ids": [tag_id]},
+    ).get_json()["formula"]
+    category_formula = client.post(
+        "/api/tag-formulas",
+        json={
+            "scope": f"category:{category_a['id']}",
+            "tag_ids": [tag_id],
+        },
+    ).get_json()["formula"]
+
+    formulas = client.get("/api/tag-formulas").get_json()["formulas"]
+    assert next(item for item in formulas if item["id"] == global_formula["id"])[
+        "scope"
+    ] == "global"
+    assert next(item for item in formulas if item["id"] == category_formula["id"])[
+        "scope"
+    ] == f"category:{category_a['id']}"
+    assert not any(
+        item["scope"] == f"category:{category_b['id']}" for item in formulas
+    )
+
+
+def test_tag_formula_rejects_unknown_category_scope(client):
+    res = client.post(
+        "/api/tag-formulas",
+        json={"scope": "category:999999", "tag_ids": []},
+    )
+    assert res.status_code == 400
+    assert res.get_json()["error"] == "Unknown formula scope"
+
+
+def test_delete_tag_detaches_it_from_formula(client):
+    tag_id = client.post("/api/tags", json={"name": "Formula tag"}).get_json()["tag"]["id"]
+    formula = client.post(
+        "/api/tag-formulas",
+        json={"tag_ids": [tag_id]},
+    ).get_json()["formula"]
+
+    assert client.delete(f"/api/tags/{tag_id}").status_code == 200
+    formulas = client.get("/api/tag-formulas").get_json()["formulas"]
+    assert next(item for item in formulas if item["id"] == formula["id"])["tag_ids"] == []
+
+
+def test_dashboard_includes_saved_tag_formulas(client):
+    tag_id = client.post("/api/tags", json={"name": "Saved formula"}).get_json()["tag"]["id"]
+    formula_id = client.post(
+        "/api/tag-formulas",
+        json={"tag_ids": [tag_id]},
+    ).get_json()["formula"]["id"]
+
+    page = client.get("/")
+    assert page.status_code == 200
+    html = page.get_data(as_text=True)
+    assert "tagFormulas" in html
+    assert f'"id": {formula_id}' in html

@@ -34,7 +34,9 @@
       categories: {{ categories|tojson }},
       rules: {{ rules|tojson }},
       tags: {{ (tags or [])|tojson }},
+      tagFormulas: {{ (tag_formulas|default([]))|tojson }},
       catSort: {{ (cat_sort or 'alpha')|tojson }},
+      catSortDirection: {{ (cat_sort_direction|default('asc'))|tojson }},
       pie: {{ summary.pie|tojson }},
       strings: {
         choose_category: {{ t('choose_category')|tojson }},
@@ -75,12 +77,16 @@
         add_tag: {{ t('add_tag')|tojson }},
         edit_tag: {{ t('edit_tag')|tojson }},
         no_tags: {{ t('no_tags')|tojson }},
-        tags_count: {{ t('tags_count')|tojson }},
         confirm_delete_tag: {{ t('confirm_delete_tag')|tojson }},
         tags: {{ t('tags')|tojson }},
+        choose_tag: {{ t('choose_tag')|tojson }},
+        add_tag_choice: {{ t('add_tag_choice')|tojson }},
+        remove_tag: {{ t('remove_tag')|tojson }},
         sum_tags: {{ t('sum_tags')|tojson }},
         sum_tags_hint: {{ t('sum_tags_hint')|tojson }},
         sum_tags_result: {{ t('sum_tags_result')|tojson }},
+        add_tag_formula: {{ t('add_tag_formula')|tojson }},
+        remove_tag_formula: {{ t('remove_tag_formula')|tojson }},
         seed_categories: {{ t('seed_categories')|tojson }},
         seed_categories_none: {{ t('seed_categories_none')|tojson }},
         clear_transactions_confirm: {{ t('clear_transactions_confirm')|tojson }},
@@ -90,9 +96,12 @@
         openai_key_saved: {{ t('openai_key_saved')|tojson }},
         openai_key_cleared: {{ t('openai_key_cleared')|tojson }},
         backup_db_success: {{ t('backup_db_success')|tojson }},
+        shutdown_confirm: {{ t('shutdown_confirm')|tojson }},
+        shutdown_success: {{ t('shutdown_success')|tojson }},
         sort_categories_alpha: {{ t('sort_categories_alpha')|tojson }},
-        sort_categories_custom: {{ t('sort_categories_custom')|tojson }},
-        drag_to_reorder: {{ t('drag_to_reorder')|tojson }}
+        sort_categories_value: {{ t('sort_categories_value')|tojson }},
+        sort_ascending: {{ t('sort_ascending')|tojson }},
+        sort_descending: {{ t('sort_descending')|tojson }}
       }
     };
   </script>

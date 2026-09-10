@@ -4,24 +4,28 @@ All notable changes to this project will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
+Build metadata (`+N`) marks interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2+1** is still release **0.4.2**, build **1**.
+
 ## [Unreleased]
 
 Work in progress since **0.4.2**. Version not bumped yet — release when ready (planned: **0.5.0**).
 
+### Investments
+
+- Add a stock buy planner with USD/NIS budgets, Yahoo USD/ILS conversion, percentage allocation across selected holdings, and whole or fractional share estimates.
+- Add an editable OneZero FX-cost comparison against Meitav Trade, Altshuler Shaham Trade, and major Israeli banks.
+- Save dated OneZero NIS conversions with Yahoo historical USD values and show cumulative savings versus Meitav Trade in the portfolios table.
+
 ### Transaction tags
 
 - Add **Manage tags** to the sidebar (dashboard and investments pages).
-- Create, edit, and delete tags (name + color) in a modal grouped like Manage rules: expand a tag to see all transactions that carry it.
+- Create, edit, and delete tags (name + color) in a modal.
 - Assign **multiple tags** per transaction via chip pickers in:
   - the edit transaction modal
   - uncategorized (orange banner) rows (tags can be saved without choosing a category)
 - Show tag chips on transaction rows in the dashboard table.
-- **Sum tags** — pick two or more tags to see their combined total:
-  - per open category (above that category’s transaction list)
-  - globally in the table header (across all categories, respects the current date range)
-- Each transaction is counted once in a sum even if it has several of the selected tags.
 - New API: `GET/POST /api/tags`, `PATCH/DELETE /api/tags/<id>`, `GET /api/tags/<id>/transactions`; transaction `PATCH` accepts `tag_ids`.
-- New DB tables: `tags`, `transaction_tags` (many-to-many).
+- New DB tables: `tags`, `transaction_tags`.
 - English and Hebrew strings for all tag UI.
 - Tests in `tests/test_tags.py`.
 
@@ -33,7 +37,7 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 ### Date filters
 
 - **From** field is a month picker (`YYYY-MM`), defaulting to the 1st of the current month.
-- **To** field defaults to the last day of the selected From month.
+- **To** field is a month picker (`YYYY-MM`), defaulting to the same month as From (through the last day of that month).
 - **To** cannot be set earlier than the From month.
 
 ### Transaction splitting
@@ -61,6 +65,52 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 - Split Yahoo Finance into `integrations/yahoo/` (`session`, `portfolios`, `quotes`, `history`).
 - Split bank/card import into `services/importer/` (`common`, `hapoalim`, `isracard`, `discount`).
 - Split dashboard transaction JS into `transactions.js` + `transactions-edit.js` / `transactions-split.js` / `transactions-banner.js`.
+
+---
+
+## 0.4.2+1 - 2026-09-10
+
+First build under **0.4.2** (SemVer build metadata). Core version unchanged.
+
+### Tags — persisted sum formulas
+
+- **Sum tags** — save multiple formulas of one or more tags and see each combined total:
+  - per open category (above that category’s transaction list)
+  - globally in the table header (across all categories, respects the current date range)
+- Allow a formula with **one or more** tags (previously required two or more).
+- Global and per-category formula lists are independent, so every category can use different formulas.
+- Tag-sum formulas are persisted in the database and restored after a reload; use **+** to add formulas and **×** to remove them.
+- Each transaction is counted once in a sum even if it has several of the selected tags.
+- New API: formula CRUD under `/api/tag-formulas`.
+- New DB tables: `tag_sum_formulas` and `tag_formula_tags` (with `scope` migration support).
+
+### Categories — A–Z / Value sorting
+
+- Move the category-sort button above the global tag-sum formulas so the formula header can use the full table width.
+- Replace custom category ordering with an **A–Z / Value** selector and an adjacent ascending/descending arrow; the same selection also sorts transactions inside each category by description or amount.
+
+### Close app from the web
+
+- Add **Close app** in the sidebar (under Settings) and in Settings — stop the local server from the browser (same effect as Ctrl+C in the `run.bat` window).
+
+### Date filters — purchase month
+
+- **To** is a month picker like **From** (`YYYY-MM`); the range covers whole months through the last day of To.
+- Filter the transaction table by **purchase date** (`txn_date`) so choosing a From month shows that month’s transactions (not earlier purchase dates that were billed later on a credit-card statement).
+- If To is still set before the new From month, snap To to the selected From month instead of falling into the previous month.
+
+### Dashboard updates without full reload
+
+- After editing, adding, deleting, or splitting a transaction (and after sorting categories), refresh the table, unsorted banner, tag sums, and pie chart in place — no full page reload.
+
+### Manage tags — list only
+
+- Show only tag name, color, and edit/delete actions in **Manage tags** (no per-tag transaction list, count, or sum).
+
+### Tag picker — dropdown via +
+
+- Replace tag toggle chips with selected-tag chips and a **+** control that opens a dropdown to choose another tag (edit modal and unsorted banner). Remove a tag with **×** on its chip.
+- Sum-tag formulas: use **+** (`tag-formula-add`) to add a formula row with a tag dropdown; no extra tag **+** on empty formulas.
 
 ---
 

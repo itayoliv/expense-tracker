@@ -17,8 +17,7 @@
   const tagColorHex = document.getElementById("tag-color-hex");
 
   let managedTags = Array.isArray(APP.tags) ? [...APP.tags] : [];
-  const expandedGroups = new Set();
-  const loadedTxns = new Map();
+  let tagFormulas = Array.isArray(APP.tagFormulas) ? [...APP.tagFormulas] : [];
 
   function str(key, fallback) {
     return (APP.strings && APP.strings[key]) || fallback;
@@ -62,69 +61,17 @@
   if (tagColor) tagColor.addEventListener("input", () => syncColorInputs(true));
   if (tagColorHex) tagColorHex.addEventListener("change", () => syncColorInputs(false));
 
-  function txnRowHtml(tx) {
-    const desc = escapeHtml(tx.custom_description || tx.description || "");
-    return `
-      <div class="tag-txn-row">
-        <span class="tag-txn-desc">${desc}</span>
-        <span class="tag-txn-date">${escapeHtml(tx.date || "")}</span>
-        <span class="tag-txn-amt">${escapeHtml(formatMoney(tx.amount))}</span>
-      </div>`;
-  }
-
-  async function loadTagTransactions(tagId, bodyEl) {
-    if (!bodyEl) return;
-    if (loadedTxns.has(tagId)) {
-      bodyEl.innerHTML = loadedTxns.get(tagId).map(txnRowHtml).join("") ||
-        `<div class="categories-empty">${escapeHtml(str("no_tags", "No tags yet."))}</div>`;
-      return;
-    }
-    bodyEl.innerHTML = `<div class="categories-empty">…</div>`;
-    try {
-      const res = await fetch(`/api/tags/${tagId}/transactions`);
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && Array.isArray(data.transactions)) {
-        loadedTxns.set(tagId, data.transactions);
-        bodyEl.innerHTML =
-          data.transactions.map(txnRowHtml).join("") ||
-          `<div class="categories-empty">${escapeHtml(str("no_tags", "No tags yet."))}</div>`;
-      } else {
-        bodyEl.innerHTML = `<div class="categories-empty">${escapeHtml(data.error || "Error")}</div>`;
-      }
-    } catch {
-      bodyEl.innerHTML = `<div class="categories-empty">Error</div>`;
-    }
-  }
-
   function bindTagRowActions() {
     if (!tagsList) return;
     tagsList.querySelectorAll(".btn-tag-edit").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
+      btn.addEventListener("click", () => {
         const tag = managedTags.find((t) => String(t.id) === btn.dataset.id);
         if (tag) openTagEditor(tag);
       });
     });
     tagsList.querySelectorAll(".btn-tag-delete").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        deleteTag(btn.dataset.id);
-      });
-    });
-    tagsList.querySelectorAll(".tag-group-header").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const groupKey = btn.dataset.groupKey || "";
-        const group = btn.closest(".rule-group");
-        if (!group) return;
-        const open = !group.classList.contains("open");
-        group.classList.toggle("open", open);
-        btn.setAttribute("aria-expanded", open ? "true" : "false");
-        if (open) {
-          expandedGroups.add(groupKey);
-          loadTagTransactions(groupKey, group.querySelector(".rule-group-body"));
-        } else {
-          expandedGroups.delete(groupKey);
-        }
+        deleteTag(btn.dataset.id);
       });
     });
   }
@@ -138,37 +85,22 @@
       return;
     }
 
-    const countLabel = str("tags_count", "{n} transactions");
     tagsList.innerHTML = managedTags
-      .map((tag) => {
-        const key = String(tag.id);
-        const forceOpen = expandedGroups.has(key);
-        const countText = countLabel.replace("{n}", String(tag.txn_count || 0));
-        const totalText = formatMoney(tag.total || 0);
-        return `
-      <div class="rule-group${forceOpen ? " open" : ""}" data-group-key="${escapeHtml(key)}">
-        <div class="tag-group-top">
-          <button type="button" class="rule-group-header tag-group-header" data-group-key="${escapeHtml(key)}" aria-expanded="${forceOpen ? "true" : "false"}">
-            <span class="chevron">▸</span>
-            <span class="cat-manage-swatch" style="background:${escapeHtml(tag.color || "#6B7280")}"></span>
-            <span class="rule-group-name">${escapeHtml(tag.name || "")}</span>
-            <span class="rule-group-count">${escapeHtml(countText)}</span>
-            <span class="tag-group-total">${escapeHtml(totalText)}</span>
-          </button>
-          <div class="tag-group-actions">
-            <button type="button" class="btn ghost btn-tag-edit" data-id="${tag.id}">${escapeHtml(str("edit", "Edit"))}</button>
-            <button type="button" class="btn ghost danger btn-tag-delete" data-id="${tag.id}">${escapeHtml(str("delete", "Delete"))}</button>
-          </div>
+      .map(
+        (tag) => `
+      <div class="cat-manage-row" data-id="${tag.id}">
+        <span class="cat-manage-swatch" style="background:${escapeHtml(tag.color || "#6B7280")}"></span>
+        <div class="cat-manage-meta">
+          <span class="cat-manage-name">${escapeHtml(tag.name || "")}</span>
         </div>
-        <div class="rule-group-body"></div>
-      </div>`;
-      })
+        <div class="cat-manage-actions">
+          <button type="button" class="btn ghost btn-tag-edit" data-id="${tag.id}">${escapeHtml(str("edit", "Edit"))}</button>
+          <button type="button" class="btn ghost danger btn-tag-delete" data-id="${tag.id}">${escapeHtml(str("delete", "Delete"))}</button>
+        </div>
+      </div>`
+      )
       .join("");
     bindTagRowActions();
-    expandedGroups.forEach((key) => {
-      const group = tagsList.querySelector(`.rule-group[data-group-key="${CSS.escape(key)}"]`);
-      if (group) loadTagTransactions(key, group.querySelector(".rule-group-body"));
-    });
   }
 
   function openTagEditor(tag) {
@@ -197,7 +129,6 @@
       if (res.ok && Array.isArray(data.tags)) {
         managedTags = data.tags;
         APP.tags = managedTags;
-        loadedTxns.clear();
         renderTagsList();
         refreshTagPickers();
         initTagSumWidgets();
@@ -214,8 +145,13 @@
     if (res.ok) {
       managedTags = managedTags.filter((t) => String(t.id) !== String(id));
       APP.tags = managedTags;
-      loadedTxns.delete(String(id));
-      expandedGroups.delete(String(id));
+      tagFormulas = tagFormulas.map((formula) => ({
+        ...formula,
+        tag_ids: (formula.tag_ids || []).filter(
+          (tagId) => String(tagId) !== String(id)
+        ),
+      }));
+      APP.tagFormulas = tagFormulas;
       renderTagsList();
       refreshTagPickers();
       initTagSumWidgets();
@@ -226,36 +162,12 @@
   }
 
   function refreshTagPickers() {
-    document.querySelectorAll(".tag-picker-chips").forEach((wrap) => {
-      const picker = wrap.closest(".tag-picker");
-      const selected = new Set(
-        String((picker && picker.dataset.selected) || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      );
-      // Preserve selection for txn modal picker via selected class
-      const currentSelected = new Set(
-        Array.from(wrap.querySelectorAll(".tag-chip-toggle.selected")).map(
-          (b) => b.dataset.tagId
-        )
-      );
-      const useSelected = currentSelected.size ? currentSelected : selected;
-      wrap.innerHTML = managedTags
-        .map((tag) => {
-          const sel = useSelected.has(String(tag.id)) ? " selected" : "";
-          return `<button type="button" class="tag-chip tag-chip-toggle${sel}" data-tag-id="${tag.id}" style="--tag-color: ${escapeHtml(tag.color || "#6B7280")}">${escapeHtml(tag.name || "")}</button>`;
-        })
-        .join("");
-    });
     if (ui.bindTagPickers) ui.bindTagPickers();
   }
 
   if (btnManageTags) {
     btnManageTags.addEventListener("click", () => {
       managedTags = Array.isArray(APP.tags) ? [...APP.tags] : [];
-      expandedGroups.clear();
-      loadedTxns.clear();
       showTagList();
       renderTagsList();
       openModal(tagsModal);
@@ -309,7 +221,6 @@
             })
           );
           APP.tags = managedTags;
-          expandedGroups.add(String(data.tag.id));
         } else {
           await refreshManagedTags();
         }
@@ -345,11 +256,11 @@
     rows.forEach((row) => {
       parseTagIds(row.dataset.tags).forEach((id) => present.add(id));
     });
-    return managedTags.filter((t) => present.has(String(t.id)));
+    return present;
   }
 
   function sumForSelected(rows, selectedIds) {
-    if (selectedIds.size < 2) return 0;
+    if (!selectedIds.size) return 0;
     let total = 0;
     rows.forEach((row) => {
       const ids = parseTagIds(row.dataset.tags);
@@ -360,13 +271,75 @@
     return total;
   }
 
+  function setTagFormulas(formulas) {
+    tagFormulas = formulas;
+    APP.tagFormulas = tagFormulas;
+    document.querySelectorAll(".tag-sum").forEach(updateTagSumWidget);
+  }
+
+  async function saveTagFormula(formula, tagIds) {
+    const isNew = !formula.id;
+    const url = isNew ? "/api/tag-formulas" : `/api/tag-formulas/${formula.id}`;
+    const body = { tag_ids: tagIds };
+    if (isNew) body.scope = formula.scope || "global";
+    try {
+      const res = await fetch(url, {
+        method: isNew ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.formula) {
+        alert(data.error || "Error");
+        initTagSumWidgets();
+        return;
+      }
+      if (isNew) {
+        setTagFormulas([...tagFormulas, data.formula]);
+      } else {
+        setTagFormulas(
+          tagFormulas.map((item) =>
+            String(item.id) === String(formula.id) ? data.formula : item
+          )
+        );
+      }
+    } catch {
+      alert("Error");
+      initTagSumWidgets();
+    }
+  }
+
+  async function addTagFormula(scope) {
+    await saveTagFormula({ id: null, scope, tag_ids: [] }, []);
+  }
+
+  async function deleteTagFormula(formulaId) {
+    try {
+      const res = await fetch(`/api/tag-formulas/${formulaId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Error");
+        return;
+      }
+      setTagFormulas(
+        tagFormulas.filter((item) => String(item.id) !== String(formulaId))
+      );
+    } catch {
+      alert("Error");
+    }
+  }
+
   function updateTagSumWidget(widget) {
-    const chipsWrap = widget.querySelector(".tag-sum-chips");
-    const resultEl = widget.querySelector(".tag-sum-result");
-    if (!chipsWrap || !resultEl) return;
+    const formulasWrap = widget.querySelector(".tag-formulas");
+    const addButton = widget.querySelector(".tag-formula-add");
+    if (!formulasWrap || !addButton) return;
 
     const scope = widget.dataset.scope;
     const catKey = widget.dataset.cat;
+    const formulaScope =
+      scope === "category" && catKey ? `category:${catKey}` : "global";
     let rows;
     if (scope === "category" && catKey) {
       const detail = document.querySelector(
@@ -377,61 +350,126 @@
       rows = collectRows(null);
     }
 
-    const available = tagsPresentInRows(rows);
-    const selected = new Set(
-      Array.from(chipsWrap.querySelectorAll(".tag-chip-toggle.selected")).map(
-        (b) => b.dataset.tagId
-      )
+    const presentIds = tagsPresentInRows(rows);
+    const formulas = tagFormulas.filter(
+      (formula) => (formula.scope || "global") === formulaScope
     );
 
-    if (!available.length) {
-      chipsWrap.innerHTML = `<span class="tag-sum-empty">${escapeHtml(
-        str("sum_tags_hint", "Select two or more tags")
-      )}</span>`;
-      resultEl.hidden = true;
-      resultEl.textContent = "";
-      return;
-    }
-
-    chipsWrap.innerHTML = available
-      .map((tag) => {
-        const sel = selected.has(String(tag.id)) ? " selected" : "";
-        return `<button type="button" class="tag-chip tag-chip-toggle${sel}" data-tag-id="${tag.id}" style="--tag-color: ${escapeHtml(tag.color || "#6B7280")}">${escapeHtml(tag.name || "")}</button>`;
+    formulasWrap.innerHTML = formulas
+      .map((formula) => {
+        const selectedIds = new Set(
+          (formula.tag_ids || []).map((id) => String(id))
+        );
+        const available = managedTags.filter(
+          (tag) =>
+            presentIds.has(String(tag.id)) || selectedIds.has(String(tag.id))
+        );
+        const chosenTags = managedTags.filter((tag) =>
+          selectedIds.has(String(tag.id))
+        );
+        const remaining = available.filter(
+          (tag) => !selectedIds.has(String(tag.id))
+        );
+        const chips = chosenTags
+          .map(
+            (tag) => `
+            <span class="tag-chip tag-chip-selected" data-tag-id="${tag.id}" style="--tag-color: ${escapeHtml(tag.color || "#6B7280")}">
+              ${escapeHtml(tag.name || "")}
+              <button type="button" class="tag-chip-remove" data-tag-id="${tag.id}" title="${escapeHtml(str("remove_tag", "Remove tag"))}" aria-label="${escapeHtml(str("remove_tag", "Remove tag"))}">×</button>
+            </span>`
+          )
+          .join("");
+        // New / incomplete rows show the dropdown immediately (no extra +).
+        // Rows with tags also get a visible dropdown for any remaining tags.
+        const addControl = remaining.length
+          ? `<div class="tag-add-wrap">
+               <select class="tag-add-select">
+                 <option value="">${escapeHtml(str("choose_tag", "Choose tag"))}</option>
+                 ${remaining
+                   .map(
+                     (tag) =>
+                       `<option value="${tag.id}">${escapeHtml(tag.name || "")}</option>`
+                   )
+                   .join("")}
+               </select>
+             </div>`
+          : !chosenTags.length
+            ? `<span class="tag-sum-empty">${escapeHtml(
+                str("sum_tags_hint", "Add one or more tags with +")
+              )}</span>`
+            : "";
+        let result = "";
+        if (selectedIds.size) {
+          const labels = chosenTags.map((tag) => tag.name || "").join(" + ");
+          const total = sumForSelected(rows, selectedIds);
+          result = str("sum_tags_result", "{labels} = {amount}")
+            .replace("{labels}", labels)
+            .replace("{amount}", formatMoney(total));
+        }
+        const remove = formula.id
+          ? `<button type="button" class="tag-formula-remove" data-formula-id="${formula.id}" title="${escapeHtml(str("remove_tag_formula", "Remove formula"))}" aria-label="${escapeHtml(str("remove_tag_formula", "Remove formula"))}">×</button>`
+          : "";
+        return `
+          <div class="tag-formula-row" data-formula-id="${formula.id || ""}">
+            <div class="tag-sum-chips">${chips}${addControl}</div>
+            <div class="tag-sum-result">${escapeHtml(result)}</div>
+            ${remove}
+          </div>`;
       })
       .join("");
 
-    chipsWrap.querySelectorAll(".tag-chip-toggle").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        btn.classList.toggle("selected");
-        refreshResult();
+    formulasWrap.querySelectorAll(".tag-chip-remove").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const row = btn.closest(".tag-formula-row");
+        const formulaId = row && row.dataset.formulaId;
+        const formula = formulaId
+          ? tagFormulas.find((item) => String(item.id) === formulaId)
+          : null;
+        if (!formula) return;
+        const removeId = String(btn.dataset.tagId || "");
+        const ids = (formula.tag_ids || [])
+          .map((id) => String(id))
+          .filter((id) => id !== removeId)
+          .map(Number);
+        btn.disabled = true;
+        await saveTagFormula(formula, ids);
       });
     });
 
-    function refreshResult() {
-      const chosen = Array.from(
-        chipsWrap.querySelectorAll(".tag-chip-toggle.selected")
-      );
-      const ids = new Set(chosen.map((b) => b.dataset.tagId));
-      if (ids.size < 2) {
-        resultEl.hidden = true;
-        resultEl.textContent = str("sum_tags_hint", "Select two or more tags");
-        resultEl.hidden = false;
-        return;
-      }
-      const labels = chosen.map((b) => b.textContent.trim()).join(" + ");
-      const total = sumForSelected(rows, ids);
-      const template = str("sum_tags_result", "{labels} = {amount}");
-      resultEl.textContent = template
-        .replace("{labels}", labels)
-        .replace("{amount}", formatMoney(total));
-      resultEl.hidden = false;
-    }
+    formulasWrap.querySelectorAll(".tag-add-select").forEach((select) => {
+      select.addEventListener("change", async () => {
+        const row = select.closest(".tag-formula-row");
+        const formulaId = row && row.dataset.formulaId;
+        const formula = formulaId
+          ? tagFormulas.find((item) => String(item.id) === formulaId)
+          : null;
+        if (!formula) return;
+        const id = Number(select.value);
+        if (!Number.isFinite(id) || id <= 0) return;
+        const ids = [
+          ...new Set([...(formula.tag_ids || []).map(Number), id]),
+        ];
+        select.disabled = true;
+        await saveTagFormula(formula, ids);
+      });
+    });
 
-    refreshResult();
+    formulasWrap.querySelectorAll(".tag-formula-remove").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        deleteTagFormula(btn.dataset.formulaId)
+      );
+    });
+
+    addButton.onclick = () => addTagFormula(formulaScope);
   }
 
   function initTagSumWidgets() {
     managedTags = Array.isArray(APP.tags) ? [...APP.tags] : managedTags;
+    tagFormulas = Array.isArray(APP.tagFormulas)
+      ? [...APP.tagFormulas]
+      : tagFormulas;
     document.querySelectorAll(".tag-sum").forEach(updateTagSumWidget);
   }
 

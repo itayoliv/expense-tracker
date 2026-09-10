@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from expense_tracker.db import get_session
 from expense_tracker.integrations.gpt_sort import has_api_key
@@ -15,8 +15,14 @@ from expense_tracker.services.investment_sectors import (
     classify_portfolio_symbols,
     count_unassigned_symbols,
 )
-from expense_tracker.models import Category
-from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories
+from expense_tracker.models import Category, InvestmentFxConversion
+from expense_tracker.routes.helpers import (
+    cat_sort_direction,
+    cat_sort_mode,
+    lang,
+    show_pie,
+    sort_categories,
+)
 from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
 from expense_tracker.integrations.yahoo import (
     YahooFinanceError,
@@ -24,6 +30,7 @@ from expense_tracker.integrations.yahoo import (
     fetch_live_quotes,
     fetch_portfolios,
     fetch_usd_ils_rate,
+    fetch_usd_ils_rate_on_date,
     is_connected,
     load_cache,
 )
@@ -69,6 +76,7 @@ def investments():
 
     with get_session() as session:
         sort_mode = cat_sort_mode()
+        sort_direction = cat_sort_direction()
         categories = sort_categories(
             session.scalars(select(Category)).all(),
             current_lang,
@@ -77,6 +85,15 @@ def investments():
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
         tags_json = list_tag_payloads(session)
+        conversions = session.scalars(
+            select(InvestmentFxConversion).order_by(
+                InvestmentFxConversion.conversion_date.desc(),
+                InvestmentFxConversion.id.desc(),
+            )
+        ).all()
+        onezero_saved_total = round(
+            sum(float(item.saved_nis or 0) for item in conversions), 2
+        )
 
     return render_template(
         "investments.html",
@@ -85,7 +102,9 @@ def investments():
         view="investments",
         month="all",
         date_from="",
+        date_from_month="",
         date_to="",
+        date_to_month="",
         using_range=False,
         filter_period={},
         categories=cats_json,
@@ -93,16 +112,88 @@ def investments():
         tags=tags_json,
         summary=_empty_summary(),
         cat_sort=sort_mode,
+        cat_sort_direction=sort_direction,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),
         connected=connected,
         portfolios=portfolios,
         grand_total=cache.get("grand_total") or 0,
         usd_ils=usd_ils,
+        fx_conversions=conversions,
+        onezero_saved_total=onezero_saved_total,
+        today=date.today().isoformat(),
         updated_at=_format_updated(cache.get("updated_at")),
         has_cache=bool(portfolios),
         t=lambda k, **kw: t(current_lang, k, **kw),
     )
+
+
+@bp.route("/investments/conversions", methods=["POST"])
+def create_conversion():
+    current_lang = lang()
+    wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    try:
+        amount = float(request.form.get("nis_amount") or 0)
+        if amount <= 0:
+            raise ValueError(t(current_lang, "fx_conversion_invalid_amount"))
+        conversion_date = date.fromisoformat(
+            (request.form.get("conversion_date") or "").strip()
+        )
+        if conversion_date > date.today():
+            raise ValueError(t(current_lang, "fx_conversion_future_date"))
+        rate = fetch_usd_ils_rate_on_date(conversion_date)
+        if rate <= 0:
+            raise ValueError(t(current_lang, "fx_conversion_rate_unavailable"))
+
+        onezero_fee_rate = 0.08
+        comparison_fee_rate = 0.70
+        conversion = InvestmentFxConversion(
+            conversion_date=conversion_date,
+            nis_amount=round(amount, 2),
+            usd_ils_rate=rate,
+            usd_amount=round(amount / rate, 2),
+            onezero_fee_rate=onezero_fee_rate,
+            comparison_name="Meitav Trade",
+            comparison_fee_rate=comparison_fee_rate,
+            saved_nis=round(
+                amount * ((comparison_fee_rate - onezero_fee_rate) / 100), 2
+            ),
+        )
+        with get_session() as session:
+            session.add(conversion)
+            session.commit()
+            saved_total = float(
+                session.scalar(select(func.sum(InvestmentFxConversion.saved_nis)))
+                or 0
+            )
+        message = t(current_lang, "fx_conversion_saved")
+        if wants_json:
+            return jsonify(
+                {
+                    "ok": True,
+                    "message": message,
+                    "conversion": {
+                        "id": conversion.id,
+                        "conversion_date": conversion.conversion_date.isoformat(),
+                        "nis_amount": conversion.nis_amount,
+                        "usd_ils_rate": conversion.usd_ils_rate,
+                        "usd_amount": conversion.usd_amount,
+                        "saved_nis": conversion.saved_nis,
+                    },
+                    "onezero_saved_total": round(saved_total, 2),
+                }
+            )
+        flash(message, "success")
+    except (TypeError, ValueError) as exc:
+        if wants_json:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+        flash(str(exc), "error")
+    except Exception as exc:
+        message = t(current_lang, "fx_conversion_save_error", error=str(exc))
+        if wants_json:
+            return jsonify({"ok": False, "error": message}), 502
+        flash(message, "error")
+    return redirect(url_for("investments.investments") + "#fx-savings-panel")
 
 
 @bp.route("/investments/quotes")

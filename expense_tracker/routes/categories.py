@@ -7,8 +7,18 @@ from sqlalchemy import select
 
 from expense_tracker.db import get_session
 from expense_tracker.i18n import t
-from expense_tracker.models import CategorizationRule, Category, Transaction
-from expense_tracker.routes.helpers import cat_sort_mode, lang, sort_categories
+from expense_tracker.models import (
+    CategorizationRule,
+    Category,
+    TagSumFormula,
+    Transaction,
+)
+from expense_tracker.routes.helpers import (
+    cat_sort_direction,
+    cat_sort_mode,
+    lang,
+    sort_categories,
+)
 from expense_tracker.services.payloads import category_payload, normalize_color
 
 bp = Blueprint("categories", __name__)
@@ -18,6 +28,7 @@ bp = Blueprint("categories", __name__)
 def list_categories():
     current_lang = lang()
     sort_mode = cat_sort_mode()
+    sort_direction = cat_sort_direction()
     with get_session() as session:
         categories = sort_categories(
             session.scalars(select(Category)).all(),
@@ -28,6 +39,7 @@ def list_categories():
             {
                 "ok": True,
                 "cat_sort": sort_mode,
+                "cat_sort_direction": sort_direction,
                 "categories": [category_payload(current_lang, c) for c in categories],
             }
         )
@@ -37,10 +49,16 @@ def list_categories():
 def set_category_sort_mode():
     payload = request.get_json(silent=True) or {}
     mode = (payload.get("mode") or payload.get("cat_sort") or "").strip().lower()
-    if mode not in ("alpha", "custom"):
-        return jsonify({"ok": False, "error": "mode must be alpha or custom"}), 400
-    resp = jsonify({"ok": True, "cat_sort": mode})
+    direction = (payload.get("direction") or "asc").strip().lower()
+    if mode not in ("alpha", "value"):
+        return jsonify({"ok": False, "error": "mode must be alpha or value"}), 400
+    if direction not in ("asc", "desc"):
+        return jsonify({"ok": False, "error": "direction must be asc or desc"}), 400
+    resp = jsonify(
+        {"ok": True, "cat_sort": mode, "cat_sort_direction": direction}
+    )
     resp.set_cookie("cat_sort", mode, max_age=365 * 24 * 3600)
+    resp.set_cookie("cat_sort_dir", direction, max_age=365 * 24 * 3600)
     return resp
 
 
@@ -72,12 +90,12 @@ def reorder_categories():
         resp = jsonify(
             {
                 "ok": True,
-                "cat_sort": "custom",
+                "cat_sort": "alpha",
                 "categories": [category_payload(current_lang, c) for c in ordered],
                 "message": t(current_lang, "category_order_saved"),
             }
         )
-        resp.set_cookie("cat_sort", "custom", max_age=365 * 24 * 3600)
+        resp.set_cookie("cat_sort", "alpha", max_age=365 * 24 * 3600)
         return resp
 
 
@@ -176,6 +194,14 @@ def delete_category(cat_id: int):
             select(CategorizationRule).where(CategorizationRule.category_id == cat.id)
         ).all():
             session.delete(rule)
+
+        for formula in session.scalars(
+            select(TagSumFormula).where(
+                TagSumFormula.scope == f"category:{cat.id}"
+            )
+        ).all():
+            formula.tags = []
+            session.delete(formula)
 
         session.delete(cat)
         session.commit()

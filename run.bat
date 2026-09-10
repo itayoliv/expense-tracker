@@ -26,7 +26,7 @@ if not exist "data" mkdir data
 
 echo Starting Expense Tracker...
 echo Open http://127.0.0.1:5000 in your browser.
-echo Press Ctrl+C in this window to stop the server.
+echo Press Ctrl+C in this window to stop the server, or use Settings → Close app in the browser.
 echo.
 
 start "" "http://127.0.0.1:5000"

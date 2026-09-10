@@ -67,6 +67,9 @@ def _schema_migration_pending() -> bool:
     for table_name in Base.metadata.tables:
         if table_name not in existing_tables:
             return True
+    formula_cols = _table_columns("tag_sum_formulas")
+    if formula_cols and "scope" not in formula_cols:
+        return True
     rule_cols = _table_columns("categorization_rules")
     if rule_cols and "name" not in rule_cols:
         return True
@@ -84,6 +87,13 @@ def _migrate_schema() -> None:
 
     if dbstate.engine is None:
         return
+    formula_cols = _table_columns("tag_sum_formulas")
+    if formula_cols and "scope" not in formula_cols:
+        with dbstate.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE tag_sum_formulas "
+                "ADD COLUMN scope VARCHAR(64) NOT NULL DEFAULT 'global'"
+            )
     rule_cols = _table_columns("categorization_rules")
     if rule_cols and "name" not in rule_cols:
         with dbstate.engine.begin() as conn:

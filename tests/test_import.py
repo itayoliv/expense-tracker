@@ -37,7 +37,7 @@ def test_dashboard_with_data_hides_inline_dropzone(client):
         headers={"X-Requested-With": "XMLHttpRequest"},
     )
     assert created.status_code == 200
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08-01&date_to=2026-08-31").get_data(as_text=True)
     assert 'class="empty-import"' not in html
     assert 'id="empty-import-dropzone"' not in html
     assert 'id="import-dropzone"' in html
@@ -98,13 +98,12 @@ def test_dashboard_defaults_to_current_month(client):
     html = client.get("/").get_data(as_text=True)
     assert "ThisMonth" in html
     assert "OtherMonth" not in html
-    import calendar
 
     month_key = f"{today.year:04d}-{today.month:02d}"
-    last = calendar.monthrange(today.year, today.month)[1]
-    assert f'value="{month_key}"' in html
-    assert f'value="{month_key}-{last:02d}"' in html
+    assert html.count(f'value="{month_key}"') >= 2
     assert 'type="month"' in html
+    assert 'id="date_from"' in html
+    assert 'id="date_to"' in html
     assert 'id="month"' not in html
 
 
@@ -168,13 +167,14 @@ def test_date_range_filters_transactions(client):
     )
 
     html = client.get(
-        "/?view=expenses&date_from=2026-08-01&date_to=2026-08-31"
+        "/?view=expenses&date_from=2026-08&date_to=2026-08"
     ).get_data(as_text=True)
     assert "InRange" in html
     assert "OutOfRange" not in html
     assert 'id="date_from"' in html
-    assert 'value="2026-08"' in html or 'value="2026-08-01"' in html
-    assert 'value="2026-08-31"' in html
+    assert 'type="month"' in html
+    assert 'id="date_to"' in html
+    assert html.count('value="2026-08"') >= 2
 
 
 def test_open_date_to_includes_whole_month(client):
@@ -209,12 +209,83 @@ def test_open_date_to_includes_whole_month(client):
         headers={"X-Requested-With": "XMLHttpRequest"},
     )
 
-    html = client.get("/?view=expenses&date_from=2026-08-01").get_data(as_text=True)
+    html = client.get("/?view=expenses&date_from=2026-08").get_data(as_text=True)
     assert "Early" in html
     assert "Late" in html
     assert "NextMonth" not in html
-    assert 'value="2026-08"' in html or 'value="2026-08-01"' in html
-    assert 'value="2026-08-31"' in html
+    assert html.count('value="2026-08"') >= 2
+
+
+def test_stale_date_to_does_not_fall_into_previous_month(client):
+    """Changing From to a later month must not keep an older To and swap the range."""
+    client.post(
+        "/transactions",
+        json={
+            "description": "AugustOnly",
+            "amount": 10,
+            "direction": "debit",
+            "date": "2026-08-15",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "SeptemberOnly",
+            "amount": 20,
+            "direction": "debit",
+            "date": "2026-09-10",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    # Simulate From = September while To was still August.
+    html = client.get(
+        "/?view=expenses&date_from=2026-09&date_to=2026-08"
+    ).get_data(as_text=True)
+    assert "SeptemberOnly" in html
+    assert "AugustOnly" not in html
+    assert html.count('value="2026-09"') >= 2
+
+
+def test_month_to_month_range_includes_full_months(client):
+    client.post(
+        "/transactions",
+        json={
+            "description": "AugStart",
+            "amount": 10,
+            "direction": "debit",
+            "date": "2026-08-01",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "SepEnd",
+            "amount": 20,
+            "direction": "debit",
+            "date": "2026-09-30",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    client.post(
+        "/transactions",
+        json={
+            "description": "OctOnly",
+            "amount": 30,
+            "direction": "debit",
+            "date": "2026-10-01",
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+
+    html = client.get(
+        "/?view=expenses&date_from=2026-08&date_to=2026-09"
+    ).get_data(as_text=True)
+    assert "AugStart" in html
+    assert "SepEnd" in html
+    assert "OctOnly" not in html
 
 
 def test_import_accepts_multiple_files(client):

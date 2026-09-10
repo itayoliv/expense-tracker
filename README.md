@@ -52,13 +52,14 @@ Before any schema migration, the app copies `data/expenses.db` to `data/backups/
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2** (see [CHANGELOG.md](CHANGELOG.md)).
+This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2+1** (see [CHANGELOG.md](CHANGELOG.md)).
 
 - Bump `PATCH` for bug fixes and small internal improvements.
 - Bump `MINOR` for new features that keep existing behavior working.
 - Bump `MAJOR` for breaking changes, incompatible data changes, or behavior users must adapt to.
+- Append build metadata (`+N`, e.g. **0.4.2+1**) for interim builds without changing `MAJOR.MINOR.PATCH`.
 
-Update `expense_tracker.__version__` and `CHANGELOG.md` together for each release. Git tags should use the `vMAJOR.MINOR.PATCH` format, for example `v0.1.0`.
+Update `expense_tracker.__version__` and `CHANGELOG.md` together for each release or build. Git tags should use the `vMAJOR.MINOR.PATCH` format, for example `v0.1.0` (omit `+build` from tags, or use a separate build label if needed).
 
 ## Connect Yahoo Finance (portfolios)
 

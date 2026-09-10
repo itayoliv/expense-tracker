@@ -32,6 +32,13 @@ transaction_tags = Table(
     Column("tag_id", ForeignKey("tags.id"), primary_key=True),
 )
 
+tag_formula_tags = Table(
+    "tag_formula_tags",
+    Base.metadata,
+    Column("formula_id", ForeignKey("tag_sum_formulas.id"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id"), primary_key=True),
+)
+
 
 class Category(Base):
     __tablename__ = "categories"
@@ -59,6 +66,42 @@ class Tag(Base):
 
     transactions: Mapped[list["Transaction"]] = relationship(
         secondary=transaction_tags, back_populates="tags"
+    )
+    formulas: Mapped[list["TagSumFormula"]] = relationship(
+        secondary=tag_formula_tags, back_populates="tags"
+    )
+
+
+class TagSumFormula(Base):
+    __tablename__ = "tag_sum_formulas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False, default="global")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+
+    tags: Mapped[list[Tag]] = relationship(
+        secondary=tag_formula_tags, back_populates="formulas"
+    )
+
+
+class InvestmentFxConversion(Base):
+    __tablename__ = "investment_fx_conversions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    conversion_date: Mapped[date] = mapped_column(Date, nullable=False)
+    nis_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    usd_ils_rate: Mapped[float] = mapped_column(Float, nullable=False)
+    usd_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    onezero_fee_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.08)
+    comparison_name: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="Meitav Trade"
+    )
+    comparison_fee_rate: Mapped[float] = mapped_column(
+        Float, nullable=False, default=0.70
+    )
+    saved_nis: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
     )
 
 

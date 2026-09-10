@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+import os
+import signal
+import threading
+import time
+
+from flask import Blueprint, current_app, jsonify, request
 from sqlalchemy import delete, func, select
 
 from expense_tracker.db import create_db_backup, get_session, seed_defaults
@@ -17,6 +22,18 @@ from expense_tracker.models import CategorizationRule, Transaction
 from expense_tracker.routes.helpers import lang
 
 bp = Blueprint("settings", __name__)
+
+
+def _terminate_server() -> None:
+    """Stop the local Flask process after the HTTP response can flush."""
+    time.sleep(0.35)
+    # Under the Werkzeug reloader, kill the parent watcher so it does not restart.
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        try:
+            os.kill(os.getppid(), signal.SIGTERM)
+        except OSError:
+            pass
+    os._exit(0)
 
 
 @bp.route("/api/settings/seed", methods=["POST"])
@@ -148,3 +165,13 @@ def set_pie_visibility():
     resp = jsonify({"ok": True, "show_pie": show})
     resp.set_cookie("show_pie", "1" if show else "0", max_age=365 * 24 * 3600)
     return resp
+
+
+@bp.route("/api/settings/shutdown", methods=["POST"])
+def shutdown_app():
+    """Stop the local server so the run.bat window can exit."""
+    current_lang = lang()
+    message = t(current_lang, "shutdown_success")
+    if not current_app.config.get("TESTING"):
+        threading.Thread(target=_terminate_server, daemon=True).start()
+    return jsonify({"ok": True, "message": message})

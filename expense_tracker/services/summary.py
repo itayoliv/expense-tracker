@@ -6,7 +6,7 @@ import calendar
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract, func, select
+from sqlalchemy import extract, select
 from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
@@ -48,6 +48,19 @@ def parse_date_from_arg(raw: str | None) -> date | None:
             return date(y, m, 1)
     return parse_iso_date(text)
 
+
+def parse_date_to_arg(raw: str | None) -> date | None:
+    """Accept YYYY-MM-DD or YYYY-MM (month picker → last day of that month)."""
+    text = (raw or "").strip()
+    if not text:
+        return None
+    if len(text) == 7 and text[4] == "-":
+        parsed = parse_month(text)
+        if parsed:
+            y, m = parsed
+            return last_day_of_month(date(y, m, 1))
+    return parse_iso_date(text)
+
 def current_month_key() -> str:
     today = date.today()
     return f"{today.year:04d}-{today.month:02d}"
@@ -70,29 +83,25 @@ def resolve_date_range(
     if not date_from and not date_to:
         return None, None
     start, end = date_from, date_to
+    # If To is before From (stale To after changing the month), keep From and
+    # snap To to the end of that month — never swap into the previous month.
     if start and end and start > end:
-        start, end = end, start
+        end = last_day_of_month(start)
     if start and not end:
         end = last_day_of_month(start)
     return start, end
 
 
-def billing_date_expr():
-    """Month grouping uses the billing/value date when present (credit-card statements)."""
-    return func.coalesce(Transaction.value_date, Transaction.txn_date)
-
-
 def available_months(session) -> list[str]:
-    billing = billing_date_expr()
     rows = session.execute(
         select(
-            extract("year", billing),
-            extract("month", billing),
+            extract("year", Transaction.txn_date),
+            extract("month", Transaction.txn_date),
         )
         .distinct()
         .order_by(
-            extract("year", billing).desc(),
-            extract("month", billing).desc(),
+            extract("year", Transaction.txn_date).desc(),
+            extract("month", Transaction.txn_date).desc(),
         )
     ).all()
     return [f"{int(y):04d}-{int(m):02d}" for y, m in rows if y and m]
@@ -101,26 +110,22 @@ def available_months(session) -> list[str]:
 def month_filter(query, month: tuple[int, int] | None):
     if month:
         y, m = month
-        billing = billing_date_expr()
         query = query.where(
-            extract("year", billing) == y,
-            extract("month", billing) == m,
+            extract("year", Transaction.txn_date) == y,
+            extract("month", Transaction.txn_date) == m,
         )
     return query
 
 
 def date_range_filter(query, date_from: date | None, date_to: date | None):
-    """Filter by billing date inclusive range. Either bound may be open."""
+    """Filter by transaction date (purchase date) inclusive range."""
     if not date_from and not date_to:
         return query
-    billing = billing_date_expr()
-    start, end = date_from, date_to
-    if start and end and start > end:
-        start, end = end, start
+    start, end = resolve_date_range(date_from, date_to)
     if start:
-        query = query.where(billing >= start)
+        query = query.where(Transaction.txn_date >= start)
     if end:
-        query = query.where(billing <= end)
+        query = query.where(Transaction.txn_date <= end)
     return query
 
 
@@ -213,6 +218,7 @@ def build_summary(
     date_from: date | None = None,
     date_to: date | None = None,
     cat_sort: str = "alpha",
+    cat_sort_direction: str = "asc",
 ) -> dict:
     base = select(Transaction).options(
         joinedload(Transaction.category),
@@ -288,24 +294,31 @@ def build_summary(
 
     grand = sum(g["total"] for g in groups.values())
 
-    def _group_sort_key(g: dict[str, Any]):
-        # Keep unsorted at the end of the dashboard table.
-        if g.get("key") == "__unsorted__":
-            return (1, 0, "")
-        name = (g.get("name") or "").casefold()
-        if cat_sort == "custom":
-            return (0, g.get("sort_order", 999), name)
-        return (0, 0, name)
-
-    categories = sorted(groups.values(), key=_group_sort_key)
+    unsorted_group = groups.pop("__unsorted__", None)
+    if cat_sort == "value":
+        group_key = lambda g: (g["total"], (g.get("name") or "").casefold())
+    else:
+        group_key = lambda g: ((g.get("name") or "").casefold(), g.get("key") or "")
+    categories = sorted(
+        groups.values(),
+        key=group_key,
+        reverse=cat_sort_direction == "desc",
+    )
+    if unsorted_group:
+        categories.append(unsorted_group)
     for g in categories:
         g["pct"] = round((g["total"] / grand * 100) if grand else 0, 2)
-        g["transactions"].sort(
-            key=lambda x: (
-                x.txn_date.toordinal() * -1,
-                getattr(x, "split_group", "") or f"~{x.id}",
+        if cat_sort == "value":
+            txn_key = lambda x: (x.amount, x.txn_date, x.id)
+        else:
+            txn_key = lambda x: (
+                (x.custom_description or x.description or "").casefold(),
+                x.txn_date,
                 x.id,
             )
+        g["transactions"].sort(
+            key=txn_key,
+            reverse=cat_sort_direction == "desc",
         )
         g["txns"] = [serialize_txn(lang, x) for x in g["transactions"]]
         del g["transactions"]

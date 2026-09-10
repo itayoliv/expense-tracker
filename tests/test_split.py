@@ -255,3 +255,9 @@ def test_edit_modal_includes_split_controls(client):
     edit_js = client.get("/static/js/transactions-edit.js").get_data(as_text=True)
     assert "splitMode" in split_js
     assert "splits" in edit_js
+    assert "refreshAfterTxnChange" in edit_js
+    assert "refreshDashboardBackground" in edit_js
+    cats_js = client.get("/static/js/categories.js").get_data(as_text=True)
+    assert "ui.refreshDashboardBackground = refreshDashboardBackground" in cats_js
+    banner_js = client.get("/static/js/transactions-banner.js").get_data(as_text=True)
+    assert "refreshDashboardBackground" in banner_js

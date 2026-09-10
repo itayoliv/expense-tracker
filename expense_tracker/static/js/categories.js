@@ -17,7 +17,6 @@
   const catColor = document.getElementById("cat-color");
   const catColorHex = document.getElementById("cat-color-hex");
   let managedCategories = Array.isArray(APP.categories) ? [...APP.categories] : [];
-  let dragSrcEl = null;
 
   function kindLabel(kind) {
     if (kind === "income") {
@@ -51,37 +50,51 @@
   }
 
   function currentSortMode() {
-    return APP.catSort === "custom" ? "custom" : "alpha";
+    return APP.catSort === "value" ? "value" : "alpha";
+  }
+
+  function currentSortDirection() {
+    return APP.catSortDirection === "desc" ? "desc" : "asc";
   }
 
   function sortLabel(mode) {
-    if (mode === "custom") {
-      return (APP.strings && APP.strings.sort_categories_custom) || "Custom";
+    if (mode === "value") {
+      return (APP.strings && APP.strings.sort_categories_value) || "Value";
     }
     return (APP.strings && APP.strings.sort_categories_alpha) || "A–Z";
   }
 
   function syncSortButtons() {
     const mode = currentSortMode();
+    const direction = currentSortDirection();
     document.querySelectorAll(".btn-cat-sort").forEach((btn) => {
       btn.dataset.mode = mode;
       btn.textContent = sortLabel(mode);
     });
+    document.querySelectorAll(".btn-cat-sort-direction").forEach((btn) => {
+      btn.dataset.direction = direction;
+      btn.textContent = direction === "desc" ? "↓" : "↑";
+      const label =
+        direction === "desc"
+          ? (APP.strings && APP.strings.sort_ascending) || "Sort ascending"
+          : (APP.strings && APP.strings.sort_descending) || "Sort descending";
+      btn.title = label;
+      btn.setAttribute("aria-label", label);
+    });
   }
 
-  async function setSortMode(mode) {
-    const next = mode === "custom" ? "custom" : "alpha";
+  async function setSortMode(mode, direction) {
     const res = await fetch("/api/categories/sort-mode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: next }),
+      body: JSON.stringify({ mode, direction }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       alert(err.error || "Error");
       return;
     }
-    location.reload();
+    await refreshDashboardBackground();
   }
 
   function bindSortToggleButtons() {
@@ -90,7 +103,21 @@
       btn.dataset.bound = "1";
       btn.addEventListener("click", () => {
         const current = btn.dataset.mode || currentSortMode();
-        setSortMode(current === "custom" ? "alpha" : "custom");
+        setSortMode(
+          current === "value" ? "alpha" : "value",
+          currentSortDirection()
+        );
+      });
+    });
+    document.querySelectorAll(".btn-cat-sort-direction").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        const current = btn.dataset.direction || currentSortDirection();
+        setSortMode(
+          currentSortMode(),
+          current === "desc" ? "asc" : "desc"
+        );
       });
     });
   }
@@ -113,16 +140,21 @@
     }
     const sortMatch = text.match(/catSort:\s*"([^"]+)"/);
     if (sortMatch) fields.catSort = sortMatch[1];
+    const directionMatch = text.match(/catSortDirection:\s*"([^"]+)"/);
+    if (directionMatch) fields.catSortDirection = directionMatch[1];
     return fields;
   }
 
   async function refreshDashboardBackground() {
     try {
+      const openKeys = Array.from(document.querySelectorAll(".cat-row.open")).map(
+        (row) => row.dataset.cat
+      );
       const res = await fetch(window.location.href, {
         credentials: "same-origin",
         headers: { "X-Requested-With": "XMLHttpRequest" },
       });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, "text/html");
 
@@ -136,6 +168,15 @@
       const oldBanner = document.getElementById("unsorted-banner");
       if (newBanner && oldBanner) {
         oldBanner.replaceWith(document.importNode(newBanner, true));
+      } else if (newBanner && !oldBanner) {
+        const main = document.querySelector("main.main");
+        const topbar = main && main.querySelector(".topbar");
+        if (main && topbar) {
+          topbar.insertAdjacentElement(
+            "afterend",
+            document.importNode(newBanner, true)
+          );
+        }
       } else if (!newBanner && oldBanner) {
         oldBanner.remove();
       }
@@ -143,6 +184,9 @@
       const fields = parseDashboardAppFields(html);
       if (fields.pie) APP.pie = fields.pie;
       if (fields.catSort) APP.catSort = fields.catSort;
+      if (fields.catSortDirection) {
+        APP.catSortDirection = fields.catSortDirection;
+      }
 
       syncSortButtons();
       bindSortToggleButtons();
@@ -150,11 +194,24 @@
       if (ui.bindTransactionEdits) ui.bindTransactionEdits();
       if (ui.bindUnsortedItems) ui.bindUnsortedItems();
       if (ui.bindUnsortedSearch) ui.bindUnsortedSearch();
+      if (ui.initTagSumWidgets) ui.initTagSumWidgets();
       if (ui.refreshPie) ui.refreshPie();
+
+      openKeys.forEach((key) => {
+        if (!key) return;
+        const row = document.querySelector(
+          `.cat-row[data-cat="${CSS.escape(key)}"]`
+        );
+        const btn = row && row.querySelector(".cat-toggle");
+        if (btn && row && !row.classList.contains("open")) btn.click();
+      });
+      return true;
     } catch {
-      /* keep modal open even if background refresh fails */
+      return false;
     }
   }
+
+  ui.refreshDashboardBackground = refreshDashboardBackground;
 
   function bindCategoryRowActions() {
     if (!categoriesList) return;
@@ -169,86 +226,6 @@
     });
   }
 
-  async function persistOrder() {
-    if (!categoriesList) return;
-    const ids = Array.from(categoriesList.querySelectorAll(".cat-manage-row"))
-      .map((row) => Number(row.dataset.id))
-      .filter((id) => Number.isFinite(id));
-    if (!ids.length) return;
-    const res = await fetch("/api/categories/reorder", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(err.error || "Error");
-      return;
-    }
-    const data = await res.json().catch(() => ({}));
-    if (Array.isArray(data.categories)) {
-      managedCategories = data.categories;
-      APP.categories = managedCategories;
-    }
-    APP.catSort = "custom";
-    syncSortButtons();
-    if (categoriesModal && categoriesModal.open) {
-      await refreshDashboardBackground();
-      return;
-    }
-    location.reload();
-  }
-
-  function bindDragAndDrop() {
-    if (!categoriesList) return;
-    const rows = Array.from(categoriesList.querySelectorAll(".cat-manage-row"));
-    rows.forEach((row) => {
-      row.setAttribute("draggable", "true");
-      row.addEventListener("dragstart", (e) => {
-        dragSrcEl = row;
-        row.classList.add("is-dragging");
-        if (e.dataTransfer) {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", row.dataset.id || "");
-        }
-      });
-      row.addEventListener("dragend", () => {
-        row.classList.remove("is-dragging");
-        rows.forEach((r) => r.classList.remove("drag-over"));
-        dragSrcEl = null;
-      });
-      row.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        if (!dragSrcEl || dragSrcEl === row) return;
-        row.classList.add("drag-over");
-        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
-      });
-      row.addEventListener("dragleave", () => {
-        row.classList.remove("drag-over");
-      });
-      row.addEventListener("drop", async (e) => {
-        e.preventDefault();
-        row.classList.remove("drag-over");
-        if (!dragSrcEl || dragSrcEl === row) return;
-        const rect = row.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
-        if (before) {
-          categoriesList.insertBefore(dragSrcEl, row);
-        } else {
-          categoriesList.insertBefore(dragSrcEl, row.nextSibling);
-        }
-        const orderedIds = Array.from(
-          categoriesList.querySelectorAll(".cat-manage-row")
-        ).map((r) => r.dataset.id);
-        managedCategories = orderedIds
-          .map((id) => managedCategories.find((c) => String(c.id) === String(id)))
-          .filter(Boolean);
-        APP.categories = managedCategories;
-        await persistOrder();
-      });
-    });
-  }
-
   function renderCategoriesList() {
     if (!categoriesList) return;
     if (!managedCategories.length) {
@@ -257,13 +234,10 @@
       }</div>`;
       return;
     }
-    const dragTitle =
-      (APP.strings && APP.strings.drag_to_reorder) || "Drag to reorder";
     categoriesList.innerHTML = managedCategories
       .map(
         (cat) => `
-      <div class="cat-manage-row" data-id="${cat.id}" draggable="true">
-        <span class="cat-drag-handle" title="${escapeHtml(dragTitle)}" aria-hidden="true">⋮⋮</span>
+      <div class="cat-manage-row" data-id="${cat.id}">
         <span class="cat-manage-swatch" style="background:${cat.color}"></span>
         <div class="cat-manage-meta">
           <span class="cat-manage-name">${escapeHtml(displayName(cat))}</span>
@@ -281,7 +255,6 @@
       )
       .join("");
     bindCategoryRowActions();
-    bindDragAndDrop();
   }
 
   function openCategoryEditor(cat) {
@@ -317,6 +290,9 @@
         managedCategories = data.categories;
         APP.categories = managedCategories;
         if (data.cat_sort) APP.catSort = data.cat_sort;
+        if (data.cat_sort_direction) {
+          APP.catSortDirection = data.cat_sort_direction;
+        }
         syncSortButtons();
         renderCategoriesList();
       }
@@ -339,7 +315,6 @@
   }
 
   bindCategoryRowActions();
-  bindDragAndDrop();
   bindSortToggleButtons();
   syncSortButtons();
 

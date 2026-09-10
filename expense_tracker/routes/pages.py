@@ -13,8 +13,20 @@ from expense_tracker.integrations.gpt_sort import has_api_key
 from expense_tracker.i18n import html_dir, t
 from expense_tracker.services.importer import import_file
 from expense_tracker.models import Category
-from expense_tracker.routes.helpers import cat_sort_mode, lang, show_pie, sort_categories, view
-from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
+from expense_tracker.routes.helpers import (
+    cat_sort_direction,
+    cat_sort_mode,
+    lang,
+    show_pie,
+    sort_categories,
+    view,
+)
+from expense_tracker.services.payloads import (
+    category_payload,
+    list_rule_payloads,
+    list_tag_formula_payloads,
+    list_tag_payloads,
+)
 from expense_tracker.services.summary import (
     available_months,
     build_summary,
@@ -22,7 +34,7 @@ from expense_tracker.services.summary import (
     first_day_of_month,
     last_day_of_month,
     parse_date_from_arg,
-    parse_iso_date,
+    parse_date_to_arg,
     parse_month,
 )
 
@@ -51,7 +63,7 @@ def _dashboard_dates() -> tuple[date | None, date | None, bool]:
     has_date_args = "date_from" in request.args or "date_to" in request.args
     if has_date_args:
         date_from = parse_date_from_arg(request.args.get("date_from"))
-        date_to = parse_iso_date(request.args.get("date_to"))
+        date_to = parse_date_to_arg(request.args.get("date_to"))
         if date_from and not date_to:
             date_to = last_day_of_month(date_from)
         return date_from, date_to, True
@@ -84,6 +96,7 @@ def dashboard():
     date_from_raw = date_from.isoformat() if date_from else ""
     date_from_month = date_from.strftime("%Y-%m") if date_from else ""
     date_to_raw = date_to.isoformat() if date_to else ""
+    date_to_month = date_to.strftime("%Y-%m") if date_to else ""
 
     with get_session() as session:
         months = available_months(session)
@@ -92,6 +105,7 @@ def dashboard():
             months = sorted({*months, current_month}, reverse=True)
 
         sort_mode = cat_sort_mode()
+        sort_direction = cat_sort_direction()
         summary = build_summary(
             session,
             current_view,
@@ -99,6 +113,7 @@ def dashboard():
             date_from=date_from,
             date_to=date_to,
             cat_sort=sort_mode,
+            cat_sort_direction=sort_direction,
         )
         categories = sort_categories(
             session.scalars(select(Category)).all(),
@@ -108,6 +123,7 @@ def dashboard():
         cats_json = [category_payload(current_lang, c) for c in categories]
         rules_json = list_rule_payloads(current_lang, session)
         tags_json = list_tag_payloads(session)
+        tag_formulas_json = list_tag_formula_payloads(session)
 
     filter_period: dict[str, str] = {"view": current_view}
     if date_from_raw:
@@ -130,13 +146,16 @@ def dashboard():
         date_from=date_from_raw,
         date_from_month=date_from_month,
         date_to=date_to_raw,
+        date_to_month=date_to_month,
         using_range=using_range,
         filter_period=nav_period,
         summary=summary,
         categories=cats_json,
         rules=rules_json,
         tags=tags_json,
+        tag_formulas=tag_formulas_json,
         cat_sort=sort_mode,
+        cat_sort_direction=sort_direction,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),
         t=lambda k, **kw: t(current_lang, k, **kw),

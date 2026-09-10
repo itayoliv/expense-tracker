@@ -24,23 +24,25 @@ def show_pie() -> bool:
 
 
 def cat_sort_mode() -> str:
-    """Category list order: alpha (default) or custom sort_order."""
+    """Dashboard order: alphabetical (default) or by value."""
     raw = (request.cookies.get("cat_sort") or "").strip().lower()
-    return "custom" if raw == "custom" else "alpha"
+    return "value" if raw == "value" else "alpha"
+
+
+def cat_sort_direction() -> str:
+    """Dashboard sort direction: ascending (default) or descending."""
+    raw = (request.cookies.get("cat_sort_dir") or "").strip().lower()
+    return "desc" if raw == "desc" else "asc"
 
 
 def sort_categories(categories, current_lang: str | None = None, mode: str | None = None):
-    """Return categories ordered by A-Z name or custom sort_order."""
+    """Return management categories alphabetically; values exist only in summaries."""
     cats = list(categories)
-    sort_mode = mode or cat_sort_mode()
     lang_code = current_lang or lang()
-    if sort_mode == "custom":
-        cats.sort(key=lambda c: (getattr(c, "sort_order", 999), getattr(c, "id", 0)))
-    else:
-        cats.sort(
-            key=lambda c: (
-                category_name(lang_code, c).casefold(),
-                getattr(c, "id", 0),
-            )
+    cats.sort(
+        key=lambda c: (
+            category_name(lang_code, c).casefold(),
+            getattr(c, "id", 0),
         )
+    )
     return cats

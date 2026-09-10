@@ -8,7 +8,13 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from expense_tracker.models import Base, Category, Tag  # noqa: F401 — Tag registers M2M tables
+from expense_tracker.models import (  # noqa: F401 — models register their tables
+    Base,
+    Category,
+    InvestmentFxConversion,
+    Tag,
+    TagSumFormula,
+)
 
 # expense_tracker/ (same meaning as when this lived in expense_tracker/db.py)
 PACKAGE_DIR = Path(__file__).resolve().parent.parent

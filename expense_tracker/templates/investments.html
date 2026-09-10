@@ -20,6 +20,7 @@
         <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-manage-tags">{{ t('manage_tags') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
+        <button type="button" class="nav-link nav-btn js-shutdown-app" id="btn-shutdown-app-nav">{{ t('shutdown_app') }}</button>
       </div>
       <div class="nav-section muted">
         <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('arrange') }}</span>
@@ -92,7 +93,11 @@
          data-label-sector-allocation="{{ t('sector_allocation') }}"
          data-label-sector-unclassified="{{ t('sector_unclassified_title') }}"
          data-label-sector-unclassified-hint="{{ t('sector_unclassified_hint') }}"
-         data-label-sector-no-data="{{ t('sector_no_data') }}">
+         data-label-sector-no-data="{{ t('sector_no_data') }}"
+         data-label-buy-remove="{{ t('buy_planner_remove') }}"
+         data-label-buy-over-budget="{{ t('buy_planner_over_budget') }}"
+         data-label-buy-budget-usd="{{ t('buy_planner_budget_usd') }}"
+         data-label-buy-select-stock="{{ t('buy_planner_select_stock') }}">
 
       <section class="chart-panel investments-chart-panel">
         <div class="investments-chart-header">
@@ -124,8 +129,14 @@
         <p class="muted-note chart-loading" id="holdings-chart-loading" hidden>{{ t('chart_loading') }}</p>
       </section>
 
-      <section class="chart-panel investments-sector-panel">
-        <h2 class="panel-title">{{ t('sector_allocation') }}</h2>
+      <section class="chart-panel investments-sector-panel collapsible-chart-panel">
+        <h2 class="panel-title">
+          <button type="button" class="panel-collapse-toggle" aria-expanded="false" aria-controls="sector-panel-body">
+            <span class="chevron">▸</span>
+            <span>{{ t('sector_allocation') }}</span>
+          </button>
+        </h2>
+        <div class="collapsible-panel-body hidden" id="sector-panel-body">
         <div class="investments-sector-grid">
           <div class="sector-chart-wrap">
             <canvas id="sector-allocation-chart" aria-label="{{ t('sector_allocation') }}"></canvas>
@@ -137,6 +148,198 @@
           <h3 class="sector-unclassified-title">{{ t('sector_unclassified_title') }}</h3>
           <p class="muted-note">{{ t('sector_unclassified_hint') }}</p>
           <ul class="sector-unclassified-list" id="sector-unclassified-list"></ul>
+        </div>
+        </div>
+      </section>
+
+      <section class="chart-panel buy-planner-panel collapsible-chart-panel" id="buy-planner">
+        <h2 class="panel-title">
+          <button type="button" class="panel-collapse-toggle" aria-expanded="false" aria-controls="buy-planner-body-wrap">
+            <span class="chevron">▸</span>
+            <span>{{ t('buy_planner_title') }}</span>
+          </button>
+        </h2>
+        <div class="collapsible-panel-body hidden" id="buy-planner-body-wrap">
+        <p class="muted-note buy-planner-hint">{{ t('buy_planner_hint') }}</p>
+
+        <div class="buy-planner-controls">
+          <label class="buy-planner-field">
+            <span>{{ t('buy_planner_budget') }}</span>
+            <input type="number" id="buy-budget-input" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+          </label>
+          <div class="buy-planner-field">
+            <span>{{ t('buy_planner_currency') }}</span>
+            <div class="range-tabs buy-currency-tabs" id="buy-currency-tabs">
+              <button type="button" class="range-tab" data-currency="USD">USD</button>
+              <button type="button" class="range-tab active" data-currency="ILS">₪</button>
+            </div>
+          </div>
+          <label class="buy-planner-check">
+            <input type="checkbox" id="buy-fractional">
+            <span>{{ t('buy_planner_fractional') }}</span>
+          </label>
+        </div>
+
+        <div class="buy-planner-conversion">
+          <span id="buy-budget-usd" hidden></span>
+          <span class="muted-note" id="buy-fx-rate"
+                {% if not usd_ils %}hidden{% endif %}>
+            {% if usd_ils %}{{ t('usd_ils_rate', rate='%.4f'|format(usd_ils)) }}{% endif %}
+          </span>
+          <span class="form-error" id="buy-fx-error" hidden>{{ t('buy_planner_missing_rate') }}</span>
+        </div>
+
+        <div class="buy-planner-add">
+          <label class="buy-planner-field">
+            <span>{{ t('buy_planner_stock') }}</span>
+            <select id="buy-stock-select" aria-label="{{ t('buy_planner_stock') }}"></select>
+          </label>
+          <button type="button" class="btn" id="buy-stock-add">{{ t('buy_planner_add_stock') }}</button>
+          <button type="button" class="btn" id="buy-split-equally">{{ t('buy_planner_split_equally') }}</button>
+        </div>
+
+        <p class="muted-note" id="buy-planner-empty">{{ t('buy_planner_empty') }}</p>
+        <p class="form-error" id="buy-percent-warning" hidden></p>
+
+        <div class="buy-planner-table-wrap" id="buy-planner-table-wrap" hidden>
+          <table class="txn-table buy-planner-table" id="buy-planner-table">
+            <thead>
+              <tr>
+                <th>{{ t('symbol') }}</th>
+                <th class="col-amt">{{ t('price') }} ($)</th>
+                <th class="col-amt">{{ t('buy_planner_percent') }}</th>
+                <th class="col-amt">{{ t('buy_planner_allocated') }}</th>
+                <th class="col-amt">{{ t('shares') }}</th>
+                <th class="col-amt">{{ t('buy_planner_cost') }}</th>
+                <th class="col-amt">{{ t('buy_planner_leftover') }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="buy-planner-body"></tbody>
+          </table>
+        </div>
+
+        <div class="bottom-stats buy-planner-totals">
+          <div class="stat">
+            <span class="stat-label">{{ t('buy_planner_used_percent') }}</span>
+            <span class="stat-value" id="buy-used-percent">0.00%</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">{{ t('buy_planner_leftover_percent') }}</span>
+            <span class="stat-value" id="buy-leftover-percent">100.00%</span>
+          </div>
+          <div class="stat highlight">
+            <span class="stat-label">{{ t('buy_planner_total_leftover') }}</span>
+            <span class="stat-value" id="buy-total-leftover">{{ money_usd_ils(0, usd_ils) }}</span>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <section class="chart-panel fx-savings-panel collapsible-chart-panel" id="fx-savings-panel">
+        <h2 class="panel-title">
+          <button type="button" class="panel-collapse-toggle" aria-expanded="false" aria-controls="fx-savings-body">
+            <span class="chevron">▸</span>
+            <span>{{ t('fx_savings_title') }}</span>
+          </button>
+        </h2>
+        <div class="collapsible-panel-body hidden" id="fx-savings-body">
+          <p class="muted-note">{{ t('fx_savings_hint') }}</p>
+          <form class="fx-savings-form" id="fx-savings-form">
+            <label>
+              <span>{{ t('fx_savings_amount') }}</span>
+              <input type="number" id="fx-savings-amount" min="0.01" step="0.01" inputmode="decimal" required>
+            </label>
+            <button type="submit" class="btn primary">{{ t('fx_savings_calculate') }}</button>
+          </form>
+
+          <div class="fx-savings-table-wrap">
+            <table class="txn-table fx-savings-table">
+              <thead>
+                <tr>
+                  <th>{{ t('fx_savings_institution') }}</th>
+                  <th class="col-amt">{{ t('fx_savings_rate') }}</th>
+                  <th class="col-amt">{{ t('fx_savings_cost') }}</th>
+                  <th class="col-amt">{{ t('fx_savings_saved') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="fx-savings-row fx-savings-baseline">
+                  <td><strong>OneZero</strong></td>
+                  <td class="tx-amt">
+                    <input type="number" class="fx-fee-rate" id="fx-onezero-rate" value="0.08" min="0" step="0.001" aria-label="OneZero %">
+                  </td>
+                  <td class="tx-amt fx-fee-cost">—</td>
+                  <td class="tx-amt">—</td>
+                </tr>
+                {% for institution, rate, note in [
+                  ('Meitav Trade', '0.70', t('fx_savings_estimated_spread')),
+                  ('Altshuler Shaham Trade', '0.70', t('fx_savings_max_spread')),
+                  ('Bank Hapoalim — Digital', '0.17', t('fx_savings_published_fee')),
+                  ('Mizrahi-Tefahot', '0.19', t('fx_savings_published_fee')),
+                  ('Discount Bank', '0.19', t('fx_savings_estimated_fee')),
+                  ('First International Bank', '0.175', t('fx_savings_estimated_fee')),
+                  ('Bank Leumi', '', t('fx_savings_enter_personal_rate')),
+                  (t('fx_savings_other'), '', t('fx_savings_enter_personal_rate'))
+                ] %}
+                <tr class="fx-savings-row">
+                  <td>
+                    <strong>{{ institution }}</strong>
+                    <span class="muted-note fx-rate-note">{{ note }}</span>
+                  </td>
+                  <td class="tx-amt">
+                    <input type="number" class="fx-fee-rate" value="{{ rate }}" min="0" step="0.001" aria-label="{{ institution }} %">
+                  </td>
+                  <td class="tx-amt fx-fee-cost">—</td>
+                  <td class="tx-amt fx-fee-saved">—</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="muted-note fx-savings-disclaimer">{{ t('fx_savings_disclaimer') }}</p>
+
+          <div class="fx-conversion-records">
+            <h3>{{ t('fx_conversion_history_title') }}</h3>
+            <form method="post" action="{{ url_for('investments.create_conversion') }}" class="fx-conversion-record-form" id="fx-conversion-record-form">
+              <label>
+                <span>{{ t('fx_savings_amount') }}</span>
+                <input type="number" name="nis_amount" min="0.01" step="0.01" inputmode="decimal" required>
+              </label>
+              <label>
+                <span>{{ t('fx_conversion_date') }}</span>
+                <input type="date" name="conversion_date" max="{{ today }}" value="{{ today }}" required>
+              </label>
+              <button type="submit" class="btn primary">{{ t('fx_conversion_save') }}</button>
+            </form>
+            <p class="fx-conversion-status" id="fx-conversion-status" hidden></p>
+
+            <div class="fx-savings-table-wrap" id="fx-conversion-history-wrap" {% if not fx_conversions %}hidden{% endif %}>
+              <table class="txn-table fx-conversion-history">
+                <thead>
+                  <tr>
+                    <th>{{ t('fx_conversion_date') }}</th>
+                    <th class="col-amt">{{ t('fx_conversion_nis') }}</th>
+                    <th class="col-amt">{{ t('fx_conversion_rate') }}</th>
+                    <th class="col-amt">{{ t('fx_conversion_usd') }}</th>
+                    <th class="col-amt">{{ t('fx_savings_saved') }}</th>
+                  </tr>
+                </thead>
+                <tbody id="fx-conversion-history-body">
+                  {% for conversion in fx_conversions %}
+                  <tr>
+                    <td>{{ conversion.conversion_date.isoformat() }}</td>
+                    <td class="tx-amt">{{ '{:,.2f}'.format(conversion.nis_amount) }} ₪</td>
+                    <td class="tx-amt">{{ '%.4f'|format(conversion.usd_ils_rate) }}</td>
+                    <td class="tx-amt">${{ '{:,.2f}'.format(conversion.usd_amount) }}</td>
+                    <td class="tx-amt chg-up">{{ '{:,.2f}'.format(conversion.saved_nis) }} ₪</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <p class="muted-note" id="fx-conversion-no-history" {% if fx_conversions %}hidden{% endif %}>{{ t('fx_conversion_no_history') }}</p>
+          </div>
         </div>
       </section>
 
@@ -157,25 +360,29 @@
             <tr>
               <th class="col-cat">{{ t('portfolio') }}</th>
               <th class="col-total">{{ t('market_value') }}</th>
+              <th class="col-savings">{{ t('fx_savings_saved') }}</th>
               <th class="col-pct">{{ t('holdings_count') }}</th>
               <th class="col-toggle"></th>
             </tr>
           </thead>
           <tbody>
             {% for p in portfolios %}
-            <tr class="cat-row open portfolio-block" data-cat="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
+            <tr class="cat-row portfolio-block" data-cat="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
               <td class="col-cat">
-                <button type="button" class="cat-toggle" aria-expanded="true">
+                <button type="button" class="cat-toggle" aria-expanded="false">
                   <span class="chevron">▸</span>
                   <span class="cat-name">{{ p.name }}</span>
                 </button>
               </td>
               <td class="col-total portfolio-total" data-portfolio-total="{{ p.id }}">{{ money_usd_ils(p.total_value, usd_ils) }}</td>
+              <td class="col-savings"{% if p.name|lower == 'onezero' %} id="onezero-saved-total"{% endif %}>
+                {% if p.name|lower == 'onezero' %}{{ '{:,.2f}'.format(onezero_saved_total) }} ₪{% else %}—{% endif %}
+              </td>
               <td class="col-pct">{{ p.holdings|length }}</td>
               <td class="col-toggle"></td>
             </tr>
-            <tr class="detail-row portfolio-detail" data-cat-detail="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
-              <td colspan="4">
+            <tr class="detail-row portfolio-detail hidden" data-cat-detail="pf-{{ loop.index }}" data-portfolio-id="{{ p.id }}">
+              <td colspan="5">
                 {% if p.holdings %}
                 <table class="txn-table">
                   <thead>
@@ -216,6 +423,7 @@
             <tr class="total-row">
               <td>{{ t('total_investments') }}</td>
               <td class="col-total" id="investments-table-total">{{ money_usd_ils(grand_total, usd_ils) }}</td>
+              <td class="col-savings"></td>
               <td class="col-pct"></td>
               <td></td>
             </tr>

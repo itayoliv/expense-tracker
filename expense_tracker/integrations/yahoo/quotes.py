@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from expense_tracker.integrations.yahoo._common import USER_AGENT, _num
@@ -76,6 +76,37 @@ def fetch_usd_ils_rate() -> float:
     except (TypeError, KeyError, IndexError):
         pass
     return 0.0
+
+
+def fetch_usd_ils_rate_on_date(conversion_date: date) -> float:
+    """Return Yahoo's last USD/ILS daily close on or before a date."""
+    start = datetime.combine(
+        conversion_date - timedelta(days=7), time.min, tzinfo=timezone.utc
+    )
+    end = datetime.combine(
+        conversion_date + timedelta(days=1), time.min, tzinfo=timezone.utc
+    )
+    data = _http_json(
+        "https://query1.finance.yahoo.com/v8/finance/chart/ILS=X"
+        f"?interval=1d&period1={int(start.timestamp())}&period2={int(end.timestamp())}"
+    )
+    try:
+        result = data["chart"]["result"][0]  # type: ignore[index]
+        timestamps = result.get("timestamp") or []
+        quote = (result.get("indicators") or {}).get("quote") or [{}]
+        closes = (quote[0] or {}).get("close") or []
+        rates = [
+            _num(closes[index])
+            for index, timestamp in enumerate(timestamps)
+            if index < len(closes)
+            and closes[index] is not None
+            and datetime.fromtimestamp(int(timestamp), tz=timezone.utc).date()
+            <= conversion_date
+        ]
+        positive_rates = [rate for rate in rates if rate > 0]
+        return round(positive_rates[-1], 4) if positive_rates else 0.0
+    except (TypeError, KeyError, IndexError, ValueError, OSError):
+        return 0.0
 
 
 def fetch_live_quotes(symbols: list[str]) -> dict[str, Any]:

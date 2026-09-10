@@ -14,6 +14,18 @@
   const txnModal = txn.txnModal || document.getElementById("txn-modal");
   const txnForm = txn.txnForm || document.getElementById("txn-form");
   const btnSplitToggle = txn.btnSplitToggle || document.getElementById("btn-split-toggle");
+  const closeModal = ui.closeModal || function (el) {
+    if (el && el.open) el.close();
+  };
+
+  async function refreshAfterTxnChange() {
+    closeModal(txnModal);
+    if (ui.refreshDashboardBackground) {
+      const ok = await ui.refreshDashboardBackground();
+      if (ok) return;
+    }
+    location.reload();
+  }
 
   function setTxnOriginalFieldsReadonly(readonly) {
     const descInput = document.getElementById("txn-description");
@@ -210,7 +222,7 @@
           body: JSON.stringify(body),
         });
       }
-      if (res.ok) location.reload();
+      if (res.ok) await refreshAfterTxnChange();
       else {
         const err = await res.json().catch(() => ({}));
         alert(err.error || "Error");
@@ -228,7 +240,7 @@
         "Delete this transaction?";
       if (!confirm(msg)) return;
       const res = await fetch(`/transactions/${id}`, { method: "DELETE" });
-      if (res.ok) location.reload();
+      if (res.ok) await refreshAfterTxnChange();
     });
   }
 

@@ -23,6 +23,7 @@
         <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-manage-tags">{{ t('manage_tags') }}</button>
         <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
+        <button type="button" class="nav-link nav-btn js-shutdown-app" id="btn-shutdown-app-nav">{{ t('shutdown_app') }}</button>
       </div>
       <div class="nav-section muted">
         <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('arrange') }}</span>
@@ -55,7 +56,7 @@
             <label for="date_from">{{ t('date_from') }}</label>
             <input type="month" name="date_from" id="date_from" value="{{ date_from_month }}">
             <label for="date_to">{{ t('date_to') }}</label>
-            <input type="date" name="date_to" id="date_to" value="{{ date_to }}"{% if date_from %} min="{{ date_from }}"{% endif %}>
+            <input type="month" name="date_to" id="date_to" value="{{ date_to_month }}"{% if date_from_month %} min="{{ date_from_month }}"{% endif %}>
             <button type="submit" class="btn ghost" id="btn-apply-range">{{ t('apply_range') }}</button>
           </div>
         </form>
@@ -112,12 +113,7 @@
             </label>
             <div class="tag-picker u-tag-picker" data-selected="{{ u.tags|map(attribute='id')|join(',') }}">
               <span class="tag-picker-label">{{ t('tags') }}</span>
-              <div class="tag-picker-chips">
-                {% set selected_tag_ids = u.tags|map(attribute='id')|list %}
-                {% for tag in tags %}
-                <button type="button" class="tag-chip tag-chip-toggle{% if tag.id in selected_tag_ids %} selected{% endif %}" data-tag-id="{{ tag.id }}" style="--tag-color: {{ tag.color }}">{{ tag.name }}</button>
-                {% endfor %}
-              </div>
+              <div class="tag-picker-chips"></div>
             </div>
             <select class="u-cat-select" data-txn-id="{{ u.id }}">
               <option value="">{{ t('choose_category') }}</option>
@@ -206,13 +202,20 @@
       <section class="table-panel">
         <div class="table-panel-header">
           <div class="tag-sum" id="global-tag-sum" data-scope="global">
-            <span class="tag-sum-label">{{ t('sum_tags') }}</span>
-            <div class="tag-sum-chips"></div>
-            <div class="tag-sum-result" hidden></div>
+            <div class="tag-sum-header">
+              <span class="tag-sum-label">{{ t('sum_tags') }}</span>
+              <button type="button" class="tag-formula-add" title="{{ t('add_tag_formula') }}" aria-label="{{ t('add_tag_formula') }}">+</button>
+            </div>
+            <div class="tag-formulas"></div>
           </div>
-          <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
-            {% if cat_sort == 'custom' %}{{ t('sort_categories_custom') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
-          </button>
+          <div class="category-sort-controls">
+            <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
+              {% if cat_sort == 'value' %}{{ t('sort_categories_value') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
+            </button>
+            <button type="button" class="btn ghost btn-cat-sort-direction" id="btn-cat-sort-direction" data-direction="{{ cat_sort_direction }}" title="{{ t('sort_descending') if cat_sort_direction == 'asc' else t('sort_ascending') }}" aria-label="{{ t('sort_descending') if cat_sort_direction == 'asc' else t('sort_ascending') }}">
+              {% if cat_sort_direction == 'desc' %}↓{% else %}↑{% endif %}
+            </button>
+          </div>
         </div>
         <table class="expense-table" id="expense-table">
           <thead>
@@ -242,9 +245,11 @@
             <tr class="detail-row hidden" data-cat-detail="{{ cat.key }}">
               <td colspan="4">
                 <div class="tag-sum cat-tag-sum" data-scope="category" data-cat="{{ cat.key }}">
-                  <span class="tag-sum-label">{{ t('sum_tags') }}</span>
-                  <div class="tag-sum-chips"></div>
-                  <div class="tag-sum-result" hidden></div>
+                  <div class="tag-sum-header">
+                    <span class="tag-sum-label">{{ t('sum_tags') }}</span>
+                    <button type="button" class="tag-formula-add" title="{{ t('add_tag_formula') }}" aria-label="{{ t('add_tag_formula') }}">+</button>
+                  </div>
+                  <div class="tag-formulas"></div>
                 </div>
                 <table class="txn-table">
                   <thead>
@@ -397,13 +402,9 @@
           {% endfor %}
         </select>
       </label>
-      <div class="tag-picker" id="txn-tag-picker">
+      <div class="tag-picker" id="txn-tag-picker" data-selected="">
         <span class="tag-picker-label">{{ t('tags') }}</span>
-        <div class="tag-picker-chips" id="txn-tag-chips">
-          {% for tag in tags %}
-          <button type="button" class="tag-chip tag-chip-toggle" data-tag-id="{{ tag.id }}" style="--tag-color: {{ tag.color }}">{{ tag.name }}</button>
-          {% endfor %}
-        </div>
+        <div class="tag-picker-chips" id="txn-tag-chips"></div>
       </div>
     </div>
     <div id="txn-split-panel" class="txn-split-panel hidden">

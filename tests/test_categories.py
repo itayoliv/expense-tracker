@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import func, select
 
 import expense_tracker.db as db
 from expense_tracker.models import CategorizationRule, Category, Transaction
+from expense_tracker.services.summary import build_summary
 
 DEFAULT_HEBREW_NAMES = {"הלוואות ומשכנתא", "תרבות ופנאי", "ביטוח"}
 
@@ -62,6 +65,68 @@ def test_list_categories_includes_seeded_hebrew_defaults(client):
     assert DEFAULT_HEBREW_NAMES <= names
     assert all("key" not in c for c in payload["categories"])
     assert all(isinstance(c["id"], int) for c in payload["categories"])
+
+
+def test_category_sort_mode_stores_mode_and_direction(client):
+    res = client.post(
+        "/api/categories/sort-mode",
+        json={"mode": "value", "direction": "desc"},
+    )
+    assert res.status_code == 200
+    assert res.get_json()["cat_sort"] == "value"
+    assert res.get_json()["cat_sort_direction"] == "desc"
+
+    listed = client.get("/api/categories").get_json()
+    assert listed["cat_sort"] == "value"
+    assert listed["cat_sort_direction"] == "desc"
+
+
+def test_summary_sort_applies_to_categories_and_transactions(client):
+    with db.get_session() as session:
+        category_a, category_b = session.scalars(select(Category).limit(2)).all()
+        session.add_all(
+            [
+                Transaction(
+                    txn_date=date(2026, 8, 1),
+                    description="Zulu",
+                    amount=10,
+                    direction="debit",
+                    category_id=category_a.id,
+                ),
+                Transaction(
+                    txn_date=date(2026, 8, 2),
+                    description="Alpha",
+                    amount=30,
+                    direction="debit",
+                    category_id=category_a.id,
+                ),
+                Transaction(
+                    txn_date=date(2026, 8, 3),
+                    description="Other",
+                    amount=100,
+                    direction="debit",
+                    category_id=category_b.id,
+                ),
+            ]
+        )
+        session.commit()
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 31),
+            cat_sort="value",
+            cat_sort_direction="desc",
+        )
+
+    assert [category["total"] for category in summary["categories"]] == [100, 40]
+    category_a_summary = next(
+        category
+        for category in summary["categories"]
+        if category["category_id"] == category_a.id
+    )
+    assert [txn["amount"] for txn in category_a_summary["txns"]] == [30, 10]
 
 
 def test_create_category_persists(client):
@@ -152,15 +217,24 @@ def test_dashboard_includes_settings_seed_controls(client):
     assert 'id="btn-seed-categories"' in html
     assert 'id="btn-clear-transactions"' in html
     assert 'id="btn-reset-rules"' in html
+    assert 'id="btn-shutdown-app"' in html
+    assert 'id="btn-shutdown-app-nav"' in html
     assert 'id="setting-show-pie"' in html
     js = client.get("/static/js/settings.js").get_data(as_text=True)
     assert "/api/settings/seed" in js
     assert "/api/settings/clear-transactions" in js
     assert "/api/settings/reset-rules" in js
+    assert "/api/settings/shutdown" in js
+    assert "js-shutdown-app" in js
     assert "/api/settings/pie" in js
 
 
-def test_clear_transactions_deletes_rows_and_keeps_rules(client):
+def test_shutdown_endpoint_reports_ok_without_exiting(client):
+    res = client.post("/api/settings/shutdown")
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["ok"] is True
+    assert body["message"]
     created = client.post(
         "/transactions",
         json={

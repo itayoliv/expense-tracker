@@ -67,6 +67,10 @@
           body: JSON.stringify(body),
         });
         if (res.ok) {
+          if (ui.refreshDashboardBackground) {
+            const ok = await ui.refreshDashboardBackground();
+            if (ok) return;
+          }
           location.reload();
           return;
         }

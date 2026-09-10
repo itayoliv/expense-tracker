@@ -11,6 +11,7 @@
   const btnBackupDb = document.getElementById("btn-backup-db");
   const btnClearTransactions = document.getElementById("btn-clear-transactions");
   const btnResetRules = document.getElementById("btn-reset-rules");
+  const shutdownButtons = document.querySelectorAll(".js-shutdown-app");
   const settingShowPie = document.getElementById("setting-show-pie");
 
   if (btnSettings) {
@@ -192,4 +193,45 @@
       }
     });
   }
+
+  async function shutdownApp() {
+    const msg =
+      (APP.strings && APP.strings.shutdown_confirm) ||
+      "Close Expense Tracker and stop the server?";
+    if (!confirm(msg)) return;
+    shutdownButtons.forEach((btn) => {
+      btn.disabled = true;
+    });
+    try {
+      const res = await fetch("/api/settings/shutdown", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      const doneMsg =
+        data.message ||
+        (APP.strings && APP.strings.shutdown_success) ||
+        "Server is shutting down. You can close this tab.";
+      if (!res.ok) {
+        alert(data.error || "Error");
+        shutdownButtons.forEach((btn) => {
+          btn.disabled = false;
+        });
+        return;
+      }
+      document.body.innerHTML =
+        '<main class="main" style="padding:2rem;font-family:inherit">' +
+        "<h1>Expense Tracker</h1><p>" +
+        doneMsg +
+        "</p></main>";
+    } catch (_err) {
+      document.body.innerHTML =
+        '<main class="main" style="padding:2rem;font-family:inherit">' +
+        "<h1>Expense Tracker</h1><p>" +
+        ((APP.strings && APP.strings.shutdown_success) ||
+          "Server is shutting down. You can close this tab.") +
+        "</p></main>";
+    }
+  }
+
+  shutdownButtons.forEach((btn) => {
+    btn.addEventListener("click", () => shutdownApp());
+  });
 })();

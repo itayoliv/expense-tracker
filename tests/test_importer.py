@@ -243,17 +243,22 @@ def test_discount_credit_card_parses_merchant_lines():
     assert all(r["source"] == "card" for r in rows)
 
 
-def test_dashboard_month_uses_billing_date(client):
+def test_dashboard_month_uses_purchase_date(client):
     from expense_tracker.services.importer import import_file
     import expense_tracker.db as db
 
     with db.get_session() as session:
         import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
 
-    html = client.get("/?date_from=2026-09-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" in html
-    assert "סמארטאייר תל אביב בע" in html
-    assert "APPLE.COM/BILL" in html
+    # Statement billed in September, but purchases are in June/July — filter by purchase date.
+    september = client.get("/?date_from=2026-09-01&view=expenses").get_data(as_text=True)
+    assert "דינמיקה רננים" not in september
+    assert "סמארטאייר תל אביב בע" not in september
+    assert "APPLE.COM/BILL" not in september
 
     july = client.get("/?date_from=2026-07-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" not in july
+    assert "דינמיקה רננים" in july
+    assert "APPLE.COM/BILL" in july
+
+    june = client.get("/?date_from=2026-06-01&view=expenses").get_data(as_text=True)
+    assert "סמארטאייר תל אביב בע" in june

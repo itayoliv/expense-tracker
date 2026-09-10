@@ -46,6 +46,98 @@ def test_investments_page_shows_cached_portfolios(client, monkeypatch):
     assert "AAPL" in html
     assert "Apple Inc." in html
     assert 'id="btn-refresh-investments"' in html
+    assert 'id="buy-planner"' in html
+    assert 'id="buy-budget-input"' in html
+    assert 'id="buy-currency-tabs"' in html
+    assert 'id="buy-fractional"' in html
+    assert 'id="buy-stock-select"' in html
+    assert 'id="buy-planner-table"' in html
+    assert 'id="buy-planner-body"' in html
+    assert 'aria-controls="buy-planner-body-wrap"' in html
+    assert 'class="collapsible-panel-body hidden" id="buy-planner-body-wrap"' in html
+
+
+def test_investments_page_shows_fx_savings_comparison(client, monkeypatch):
+    monkeypatch.setattr("expense_tracker.routes.investments.is_connected", lambda: True)
+    monkeypatch.setattr("expense_tracker.routes.investments.fetch_usd_ils_rate", lambda: 3.0)
+    monkeypatch.setattr(
+        "expense_tracker.routes.investments.load_cache",
+        lambda: {
+            "grand_total": 100,
+            "portfolios": [
+                {
+                    "id": "p_demo",
+                    "name": "Demo Portfolio",
+                    "total_value": 100,
+                    "holdings": [],
+                }
+            ],
+        },
+    )
+
+    html = client.get("/investments").get_data(as_text=True)
+    assert 'id="fx-savings-panel"' in html
+    assert 'id="fx-savings-amount"' in html
+    assert 'id="fx-onezero-rate"' in html
+    assert "Meitav Trade" in html
+    assert "Altshuler Shaham Trade" in html
+    assert "Bank Hapoalim" in html
+    assert "Mizrahi-Tefahot" in html
+    assert "Discount Bank" in html
+    assert 'aria-controls="fx-savings-body"' in html
+    assert 'class="collapsible-panel-body hidden" id="fx-savings-body"' in html
+
+
+def test_create_onezero_conversion_saves_historical_value_and_savings(
+    client, monkeypatch
+):
+    import expense_tracker.db as db
+    from expense_tracker.models import InvestmentFxConversion
+
+    monkeypatch.setattr("expense_tracker.routes.investments.is_connected", lambda: True)
+    monkeypatch.setattr("expense_tracker.routes.investments.fetch_usd_ils_rate", lambda: 3.2)
+    monkeypatch.setattr(
+        "expense_tracker.routes.investments.fetch_usd_ils_rate_on_date",
+        lambda _date: 3.2,
+    )
+    monkeypatch.setattr(
+        "expense_tracker.routes.investments.load_cache",
+        lambda: {
+            "grand_total": 100,
+            "portfolios": [
+                {
+                    "id": "p_onezero",
+                    "name": "OneZero",
+                    "total_value": 100,
+                    "holdings": [],
+                }
+            ],
+        },
+    )
+
+    response = client.post(
+        "/investments/conversions",
+        data={"nis_amount": "10000", "conversion_date": "2026-09-08"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["conversion"]["saved_nis"] == 62
+    assert payload["onezero_saved_total"] == 62
+
+    html = client.get("/investments").get_data(as_text=True)
+    assert "2026-09-08" in html
+    assert "3.2000" in html
+    assert "$3,125.00" in html
+    assert "62.00 ₪" in html
+
+    with db.get_session() as session:
+        conversion = session.query(InvestmentFxConversion).one()
+        assert conversion.nis_amount == 10000
+        assert conversion.usd_ils_rate == 3.2
+        assert conversion.usd_amount == 3125
+        assert conversion.saved_nis == 62
 
 
 def test_investments_refresh_success(client, monkeypatch):
@@ -274,6 +366,32 @@ def test_fetch_usd_ils_rate_uses_yahoo_quote(monkeypatch):
     assert yf.fetch_usd_ils_rate() == 3.701
 
 
+def test_fetch_usd_ils_rate_on_date_uses_last_available_close(monkeypatch):
+    from datetime import date, datetime, timezone
+
+    from expense_tracker.integrations.yahoo import quotes as yf
+
+    monkeypatch.setattr(
+        yf,
+        "_http_json",
+        lambda url, timeout=20: {
+            "chart": {
+                "result": [
+                    {
+                        "timestamp": [
+                            int(datetime(2026, 9, 6, tzinfo=timezone.utc).timestamp()),
+                            int(datetime(2026, 9, 7, tzinfo=timezone.utc).timestamp()),
+                        ],
+                        "indicators": {"quote": [{"close": [3.1, 3.2]}]},
+                    }
+                ]
+            }
+        },
+    )
+
+    assert yf.fetch_usd_ils_rate_on_date(date(2026, 9, 8)) == 3.2
+
+
 def test_investments_sectors_endpoint(client, monkeypatch):
     monkeypatch.setattr(
         "expense_tracker.routes.investments.load_cache",
@@ -370,6 +488,8 @@ def test_investments_page_sector_panel_markup(client, monkeypatch):
     assert 'id="sector-unclassified"' in html
     assert "Sector allocation" in html or "חלוקה לפי סקטורים" in html
     assert 'data-sectors-url' in html
+    assert 'aria-controls="sector-panel-body"' in html
+    assert 'class="collapsible-panel-body hidden" id="sector-panel-body"' in html
 
 
 def test_investments_refresh_classifies_with_api_key(client, monkeypatch):
