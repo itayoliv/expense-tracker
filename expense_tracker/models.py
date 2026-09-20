@@ -137,6 +137,8 @@ class Transaction(Base):
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="bank")
     categorized_by: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     split_group: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    ignored: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    ignore_reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
     imported_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )

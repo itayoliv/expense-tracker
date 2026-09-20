@@ -72,18 +72,14 @@ def _holding_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
         or row.get("market_value")
     )
 
-    # Position rows need shares and/or market value — skip bare quote ticks
-    has_position = bool(
-        row.get("quantity")
-        or row.get("shares")
-        or row.get("totalQuantity")
-        or row.get("holdingQuantity")
-        or row.get("qty")
-        or row.get("marketValue")
-        or row.get("totalValue")
-        or row.get("positionValue")
-        or row.get("market_value")
-        or row.get("_from_dom")
+    # Position / securities rows: keep even when quantity is explicitly 0 (watchlists).
+    qty_keys = ("quantity", "shares", "totalQuantity", "holdingQuantity", "qty")
+    value_keys = ("marketValue", "totalValue", "positionValue", "market_value")
+    has_position = (
+        any(k in row for k in qty_keys)
+        or any(row.get(k) not in (None, "") for k in value_keys)
+        or bool(row.get("_from_dom"))
+        or bool(row.get("_from_securities"))
     )
     if not has_position:
         return None
@@ -100,20 +96,22 @@ def _holding_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _normalize_holding(h: dict[str, Any]) -> dict[str, Any] | None:
-    """Fix mixed-up qty/price and drop empty/invalid rows."""
+    """Fix mixed-up qty/price; keep zero-share watchlist symbols."""
     symbol = str(h.get("symbol") or "").upper()
     if not _valid_symbol(symbol):
         return None
     price = _num(h.get("price"))
     quantity = _num(h.get("quantity"))
     market_value = _num(h.get("market_value"))
+    scrape_ambiguous = False
 
     # Classic scrape bug: first numeric cell (last price) stored as quantity
     if price > 0 and quantity > 0 and abs(quantity - price) / price < 0.02:
         if market_value > price * 1.05:
             quantity = market_value / price
         else:
-            # No trustworthy total — treat as unknown shares (watchlist quote)
+            # No trustworthy total — treat as ambiguous scrape, not a watchlist
+            scrape_ambiguous = True
             quantity = 0.0
             market_value = 0.0
 
@@ -124,7 +122,17 @@ def _normalize_holding(h: dict[str, Any]) -> dict[str, Any] | None:
         market_value = quantity * price
 
     if quantity <= 0 and market_value <= 0:
-        return None
+        if scrape_ambiguous:
+            return None
+        # Watchlist / zero-share symbol — keep for display + buy planner
+        return {
+            "symbol": symbol,
+            "name": str(h.get("name") or symbol),
+            "quantity": 0.0,
+            "price": round(price, 4),
+            "change_pct": round(_num(h.get("change_pct")), 4),
+            "market_value": 0.0,
+        }
 
     return {
         "symbol": symbol,
@@ -141,8 +149,11 @@ def _extract_holdings_from_payload(payload: Any) -> list[dict[str, Any]]:
     holdings: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def add_row(item: dict[str, Any]) -> None:
-        h = _holding_from_row(item)
+    def add_row(item: dict[str, Any], *, allow_zero: bool = False) -> None:
+        payload = dict(item)
+        if allow_zero:
+            payload["_from_securities"] = True
+        h = _holding_from_row(payload)
         if h and h["symbol"] not in seen:
             seen.add(h["symbol"])
             holdings.append(h)
@@ -152,7 +163,7 @@ def _extract_holdings_from_payload(payload: Any) -> list[dict[str, Any]]:
             for item in node:
                 if isinstance(item, dict):
                     if from_positions:
-                        add_row(item)
+                        add_row(item, allow_zero=True)
                     else:
                         walk(item, False)
             return
@@ -164,7 +175,7 @@ def _extract_holdings_from_payload(payload: Any) -> list[dict[str, Any]]:
             if isinstance(items, list):
                 for item in items:
                     if isinstance(item, dict):
-                        add_row(item)
+                        add_row(item, allow_zero=True)
         for key, value in node.items():
             if key in ("quoteResponse", "quotes", "spark", "chart"):
                 continue
@@ -263,12 +274,17 @@ def _fetch_holdings_dom(page, pf_id: str) -> list[dict[str, Any]]:
     def on_response(response):
         try:
             req_url = response.url.lower()
-            if "portfolio" not in req_url and "holding" not in req_url and "position" not in req_url:
+            if (
+                "portfolio" not in req_url
+                and "holding" not in req_url
+                and "position" not in req_url
+                and "watchlist" not in req_url
+            ):
                 return
             ctype = (response.headers.get("content-type") or "").lower()
             if "json" not in ctype:
                 return
-            captured.append(response.json())
+            captured.append({"url": response.url[:200], "body": response.json()})
         except Exception:
             return
 
@@ -282,7 +298,8 @@ def _fetch_holdings_dom(page, pf_id: str) -> list[dict[str, Any]]:
         except Exception:
             pass
 
-    for payload in captured:
+    for item in captured:
+        payload = item.get("body") if isinstance(item, dict) else item
         holdings = _extract_holdings_from_payload(payload)
         if holdings:
             return holdings
@@ -339,10 +356,7 @@ def _fetch_holdings_dom(page, pf_id: str) -> list[dict[str, Any]]:
                     if (!change_pct && idx.chgPct >= 0) change_pct = cellNum(idx.chgPct);
                     if (!market_value && idx.value >= 0) market_value = cellNum(idx.value);
 
-                    // Skip quote-only rows with no shares/value signals at all
-                    if (!quantity && !market_value && idx.shares < 0 && idx.value < 0 && !field('quantity')) {
-                        continue;
-                    }
+                    // Keep quote/watchlist rows that have a real symbol link even with 0 shares
                     if (change_pct.includes('%')) change_pct = change_pct.replace('%', '');
 
                     out.push({
@@ -426,8 +440,10 @@ def _enrich_quotes(page, holdings: list[dict[str, Any]]) -> None:
             h["change_pct"] = round(q["change_pct"], 4)
         if q.get("name") and (not h.get("name") or h["name"] == h["symbol"]):
             h["name"] = q["name"]
-        if h.get("quantity") and h.get("price"):
-            h["market_value"] = round(h["quantity"] * h["price"], 2)
+        if qty > 0 and h.get("price"):
+            h["market_value"] = round(qty * h["price"], 2)
+        elif qty <= 0:
+            h["market_value"] = 0.0
 
 
 def fetch_portfolios() -> dict[str, Any]:

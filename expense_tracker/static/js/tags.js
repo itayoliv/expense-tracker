@@ -263,6 +263,7 @@
     if (!selectedIds.size) return 0;
     let total = 0;
     rows.forEach((row) => {
+      if (row.classList.contains("txn-ignored")) return;
       const ids = parseTagIds(row.dataset.tags);
       if (ids.some((id) => selectedIds.has(id))) {
         total += Number(row.dataset.amount) || 0;
@@ -313,6 +314,33 @@
     await saveTagFormula({ id: null, scope, tag_ids: [] }, []);
   }
 
+  function isEmptyFormula(formula) {
+    return !Array.isArray(formula.tag_ids) || formula.tag_ids.length === 0;
+  }
+
+  async function pruneEmptyFormulas(matchScope) {
+    const toRemove = tagFormulas.filter((formula) => {
+      if (!isEmptyFormula(formula) || formula.id == null) return false;
+      const scope = formula.scope || "global";
+      if (matchScope === undefined) return true;
+      if (typeof matchScope === "function") return matchScope(scope);
+      return scope === matchScope;
+    });
+    if (!toRemove.length) return false;
+    const removeIds = new Set(toRemove.map((formula) => String(formula.id)));
+    await Promise.all(
+      toRemove.map((formula) =>
+        fetch(`/api/tag-formulas/${formula.id}`, { method: "DELETE" }).catch(
+          () => null
+        )
+      )
+    );
+    setTagFormulas(
+      tagFormulas.filter((formula) => !removeIds.has(String(formula.id)))
+    );
+    return true;
+  }
+
   async function deleteTagFormula(formulaId) {
     try {
       const res = await fetch(`/api/tag-formulas/${formulaId}`, {
@@ -354,6 +382,12 @@
     const formulas = tagFormulas.filter(
       (formula) => (formula.scope || "global") === formulaScope
     );
+    const canAddFormula = presentIds.size >= 1;
+    addButton.disabled = !canAddFormula;
+    addButton.setAttribute("aria-disabled", canAddFormula ? "false" : "true");
+    addButton.onclick = canAddFormula
+      ? () => addTagFormula(formulaScope)
+      : null;
 
     formulasWrap.innerHTML = formulas
       .map((formula) => {
@@ -434,6 +468,10 @@
           .filter((id) => id !== removeId)
           .map(Number);
         btn.disabled = true;
+        if (!ids.length) {
+          await deleteTagFormula(formula.id);
+          return;
+        }
         await saveTagFormula(formula, ids);
       });
     });
@@ -461,32 +499,48 @@
         deleteTagFormula(btn.dataset.formulaId)
       );
     });
-
-    addButton.onclick = () => addTagFormula(formulaScope);
   }
 
-  function initTagSumWidgets() {
+  async function initTagSumWidgets() {
     managedTags = Array.isArray(APP.tags) ? [...APP.tags] : managedTags;
     tagFormulas = Array.isArray(APP.tagFormulas)
       ? [...APP.tagFormulas]
       : tagFormulas;
-    document.querySelectorAll(".tag-sum").forEach(updateTagSumWidget);
+    const pruned = await pruneEmptyFormulas();
+    if (!pruned) {
+      document.querySelectorAll(".tag-sum").forEach(updateTagSumWidget);
+    }
   }
 
-  // Rebuild category sum chips when a category row is opened
+  // Rebuild category sum chips when a category row is opened;
+  // drop unfinished (no-tag) formulas when the category is collapsed.
   document.addEventListener("click", (e) => {
     const toggle = e.target.closest(".cat-toggle");
     if (!toggle) return;
     const row = toggle.closest(".cat-row");
     if (!row) return;
     const key = row.dataset.cat;
-    requestAnimationFrame(() => {
+    requestAnimationFrame(async () => {
+      const isOpen = row.classList.contains("open");
+      if (!isOpen && key) {
+        await pruneEmptyFormulas(`category:${key}`);
+        return;
+      }
       const widget = document.querySelector(
         `.tag-sum[data-scope="category"][data-cat="${CSS.escape(key || "")}"]`
       );
       if (widget) updateTagSumWidget(widget);
     });
   });
+
+  const btnCloseAll = document.getElementById("btn-close-all");
+  if (btnCloseAll) {
+    btnCloseAll.addEventListener("click", () => {
+      requestAnimationFrame(() => {
+        pruneEmptyFormulas((scope) => String(scope).startsWith("category:"));
+      });
+    });
+  }
 
   initTagSumWidgets();
 

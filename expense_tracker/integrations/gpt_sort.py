@@ -122,6 +122,7 @@ def apply_assignments(session: Session, assignments: dict[str, int]) -> int:
             select(Transaction).where(
                 Transaction.category_id.is_(None),
                 Transaction.direction == "debit",
+                Transaction.ignored.is_(False),
                 func.lower(Transaction.description) == name_key,
             )
         ).all()
@@ -312,6 +313,7 @@ def sort_unsorted_expenses(session: Session, ask=None) -> dict[str, int]:
             select(Transaction).where(
                 Transaction.category_id.is_(None),
                 Transaction.direction == "debit",
+                Transaction.ignored.is_(False),
             )
         ).all()
     )

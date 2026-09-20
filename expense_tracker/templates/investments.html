@@ -96,8 +96,12 @@
          data-label-sector-no-data="{{ t('sector_no_data') }}"
          data-label-buy-remove="{{ t('buy_planner_remove') }}"
          data-label-buy-over-budget="{{ t('buy_planner_over_budget') }}"
+         data-label-buy-over-budget-cost="{{ t('buy_planner_over_budget_cost') }}"
          data-label-buy-budget-usd="{{ t('buy_planner_budget_usd') }}"
-         data-label-buy-select-stock="{{ t('buy_planner_select_stock') }}">
+         data-label-buy-select-stock="{{ t('buy_planner_select_stock') }}"
+         data-label-buy-mode-percent="{{ t('buy_planner_percent') }}"
+         data-label-buy-mode-shares="{{ t('shares') }}"
+         data-label-buy-mode-hint="{{ t('buy_planner_mode_hint') }}">
 
       <section class="chart-panel investments-chart-panel">
         <div class="investments-chart-header">
@@ -206,10 +210,24 @@
             <thead>
               <tr>
                 <th>{{ t('symbol') }}</th>
-                <th class="col-amt">{{ t('price') }} ($)</th>
-                <th class="col-amt">{{ t('buy_planner_percent') }}</th>
+                <th class="col-amt">{{ t('buy_planner_share_price') }}</th>
+                <th class="col-amt">
+                  <button type="button"
+                          class="buy-mode-toggle"
+                          id="buy-th-percent"
+                          data-mode="percent"
+                          aria-pressed="false"
+                          title="{{ t('buy_planner_mode_hint') }}">{{ t('buy_planner_percent') }}</button>
+                </th>
                 <th class="col-amt">{{ t('buy_planner_allocated') }}</th>
-                <th class="col-amt">{{ t('shares') }}</th>
+                <th class="col-amt">
+                  <button type="button"
+                          class="buy-mode-toggle buy-mode-active"
+                          id="buy-th-shares"
+                          data-mode="shares"
+                          aria-pressed="true"
+                          title="{{ t('buy_planner_mode_hint') }}">{{ t('shares') }}</button>
+                </th>
                 <th class="col-amt">{{ t('buy_planner_cost') }}</th>
                 <th class="col-amt">{{ t('buy_planner_leftover') }}</th>
                 <th></th>
@@ -403,7 +421,7 @@
                         data-portfolio-id="{{ p.id }}">
                       <td><strong>{{ h.symbol }}</strong></td>
                       <td class="holding-name">{{ h.name }}</td>
-                      <td class="tx-amt holding-qty">{{ '%.4f'|format(h.quantity) }}</td>
+                      <td class="tx-amt holding-qty">{% if h.quantity %}{{ '%.4f'|format(h.quantity) }}{% else %}<span class="muted-note">{{ t('watchlist_shares') }}</span>{% endif %}</td>
                       <td class="tx-amt holding-price {% if h.change_pct > 0 %}chg-up{% elif h.change_pct < 0 %}chg-down{% endif %}">${{ '%.2f'|format(h.price) }}</td>
                       <td class="tx-amt holding-chg {% if h.change_pct > 0 %}chg-up{% elif h.change_pct < 0 %}chg-down{% endif %}">
                         {{ '%+.2f'|format(h.change_pct) }}%

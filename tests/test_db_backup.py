@@ -46,6 +46,8 @@ def test_init_db_creates_backup_when_tags_table_missing(tmp_path):
             source VARCHAR(16) NOT NULL DEFAULT 'bank',
             categorized_by VARCHAR(16) NOT NULL DEFAULT '',
             split_group VARCHAR(64) NOT NULL DEFAULT '',
+            ignored BOOLEAN NOT NULL DEFAULT 0,
+            ignore_reason TEXT NOT NULL DEFAULT '',
             imported_at DATETIME NOT NULL,
             is_manual BOOLEAN NOT NULL DEFAULT 0
         )

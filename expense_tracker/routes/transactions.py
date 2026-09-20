@@ -125,6 +125,18 @@ def update_transaction(txn_id: int):
             cid = payload["category_id"]
             txn.category_id = int(cid) if cid not in (None, "", "null") else None
             txn.categorized_by = ""
+        if "ignored" in payload:
+            ignored = payload.get("ignored") in (True, "true", "1", "on")
+            reason = str(payload.get("ignore_reason") or "").strip()
+            if ignored and not reason:
+                return jsonify(
+                    {
+                        "ok": False,
+                        "error": t(current_lang, "ignore_reason_required"),
+                    }
+                ), 400
+            txn.ignored = ignored
+            txn.ignore_reason = reason if ignored else ""
         try:
             tag_ids = parse_tag_ids(payload)
             if tag_ids is not None:
@@ -134,7 +146,7 @@ def update_transaction(txn_id: int):
             return jsonify({"ok": False, "error": str(e)}), 400
 
         applied = 0
-        if txn.category_id and txn.description:
+        if txn.category_id and txn.description and not txn.ignored:
             cat = session.get(Category, txn.category_id)
             if cat:
                 if remember:

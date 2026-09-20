@@ -75,7 +75,14 @@ def _schema_migration_pending() -> bool:
         return True
     txn_cols = _table_columns("transactions")
     if txn_cols:
-        for col in ("source", "categorized_by", "custom_description", "split_group"):
+        for col in (
+            "source",
+            "categorized_by",
+            "custom_description",
+            "split_group",
+            "ignored",
+            "ignore_reason",
+        ):
             if col not in txn_cols:
                 return True
     return False
@@ -141,6 +148,20 @@ def _migrate_schema() -> None:
             conn.exec_driver_sql(
                 "ALTER TABLE transactions "
                 "ADD COLUMN custom_description TEXT NOT NULL DEFAULT ''"
+            )
+    txn_cols = _table_columns("transactions")
+    if txn_cols and "ignored" not in txn_cols:
+        with dbstate.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE transactions "
+                "ADD COLUMN ignored BOOLEAN NOT NULL DEFAULT 0"
+            )
+    txn_cols = _table_columns("transactions")
+    if txn_cols and "ignore_reason" not in txn_cols:
+        with dbstate.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE transactions "
+                "ADD COLUMN ignore_reason TEXT NOT NULL DEFAULT ''"
             )
     txn_cols = _table_columns("transactions")
     if txn_cols and "split_group" not in txn_cols:

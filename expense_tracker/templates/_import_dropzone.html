@@ -13,7 +13,20 @@
     <span class="dropzone-types">{{ t('drop_file_types') }}</span>
   </span>
   <span class="dropzone-copy hidden" id="{{ prefix }}-selected">
-    <span class="dropzone-title" id="{{ prefix }}-file-name"></span>
-    <span class="dropzone-sub">{{ t('change_file') }}</span>
+    <span class="dropzone-title">{{ t('change_file') }}</span>
+    <span class="dropzone-sub">{{ t('drop_file_types') }}</span>
   </span>
 </label>
+<div class="import-file-list hidden" id="{{ prefix }}-file-list">
+  <table class="import-files-table">
+    <thead>
+      <tr>
+        <th>{{ t('file_name') }}</th>
+        <th>{{ t('date') }}</th>
+        <th class="col-size">{{ t('file_size') }}</th>
+      </tr>
+    </thead>
+    <tbody id="{{ prefix }}-file-list-body"></tbody>
+  </table>
+</div>
+<div class="import-result hidden" id="{{ prefix }}-result" role="status"></div>

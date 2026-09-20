@@ -97,6 +97,7 @@ def apply_description(
     clauses = [
         Transaction.direction == direction,
         func.lower(Transaction.description) == desc.lower(),
+        Transaction.ignored.is_(False),
     ]
     if exclude_ids:
         clauses.append(Transaction.id.notin_(list(exclude_ids)))

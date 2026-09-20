@@ -123,7 +123,7 @@
             </select>
             <div class="u-cat-checks">
               <label class="checkbox u-remember-wrap">
-                <input type="checkbox" class="u-remember" checked>
+                <input type="checkbox" class="u-remember">
                 {{ t('remember_rule') }}
               </label>
               <label class="checkbox u-apply-wrap">
@@ -221,10 +221,13 @@
           <thead>
             <tr>
               <th class="col-cat">{{ t('category') }}</th>
+              <th class="col-count">{{ t('txn_count') }}</th>
               <th class="col-total">{{ t('total_in_category') }}</th>
+              {% if view != 'income' %}
               <th class="col-pct">
-                {% if view == 'income' %}{{ t('pct_of_income') }}{% else %}{{ t('pct_of_expenses') }}{% endif %}
+                {{ t('pct_of_expenses') }}
               </th>
+              {% endif %}
               <th class="col-toggle"></th>
             </tr>
           </thead>
@@ -238,12 +241,15 @@
                   <span class="cat-name">{{ cat.name }}</span>
                 </button>
               </td>
+              <td class="col-count">{{ cat.txns|length }}</td>
               <td class="col-total">{{ money(cat.total) }}</td>
+              {% if view != 'income' %}
               <td class="col-pct">{{ '%.2f'|format(cat.pct) }}%</td>
+              {% endif %}
               <td class="col-toggle"></td>
             </tr>
             <tr class="detail-row hidden" data-cat-detail="{{ cat.key }}">
-              <td colspan="4">
+              <td colspan="{{ 4 if view == 'income' else 5 }}">
                 <div class="tag-sum cat-tag-sum" data-scope="category" data-cat="{{ cat.key }}">
                   <div class="tag-sum-header">
                     <span class="tag-sum-label">{{ t('sum_tags') }}</span>
@@ -266,8 +272,8 @@
                     <tr data-txn-id="{{ tx.id }}"
                         data-tags="{{ tx.tags|map(attribute='id')|join(',') }}"
                         data-amount="{{ '%.2f'|format(tx.amount) }}"
+                        class="{% if tx.ignored %}txn-ignored{% endif %}{% if tx.split_group %} txn-split-part{% endif %}"
                         {% if tx.split_group %}
-                        class="txn-split-part"
                         data-split-group="{{ tx.split_group }}"
                         style="--split-accent: {{ tx.split_accent }}"
                         {% endif %}>
@@ -280,10 +286,16 @@
                           {% if tx.split_group %}
                             <span class="split-badge">{{ t('split_badge') }}</span>
                           {% endif %}
+                          {% if tx.ignored %}
+                            <span class="ignored-badge">{{ t('ignored_badge') }}</span>
+                          {% endif %}
                           {% if tx.categorized_by == 'gpt' %}
                             <span class="gpt-badge">{{ t('gpt_tag') }}</span>
                           {% endif %}
                         </div>
+                        {% if tx.ignored and tx.ignore_reason %}
+                          <div class="tx-ignore-reason">{{ tx.ignore_reason }}</div>
+                        {% endif %}
                         {% if tx.tags %}
                         <div class="tx-tags">
                           {% for tag in tx.tags %}
@@ -314,6 +326,8 @@
                           "category_id": tx.category_id,
                           "direction": tx.direction,
                           "split_group": tx.split_group,
+                          "ignored": tx.ignored,
+                          "ignore_reason": tx.ignore_reason,
                           "tag_ids": tx.tags|map(attribute="id")|list
                         }|tojson }}'>✎</button>
                       </td>
@@ -332,6 +346,7 @@
                 {% elif view == 'income' %}{{ t('total_income') }}
                 {% else %}{{ t('net_total') }}{% endif %}
               </td>
+              <td class="col-count"></td>
               <td class="col-total">
                 {% if view == 'bottom' %}
                   {{ money(summary.net) }}
@@ -339,7 +354,9 @@
                   {{ money(summary.grand_total) }}
                 {% endif %}
               </td>
+              {% if view != 'income' %}
               <td class="col-pct">{% if view != 'bottom' %}100%{% endif %}</td>
+              {% endif %}
               <td></td>
             </tr>
           </tfoot>
@@ -405,6 +422,16 @@
       <div class="tag-picker" id="txn-tag-picker" data-selected="">
         <span class="tag-picker-label">{{ t('tags') }}</span>
         <div class="tag-picker-chips" id="txn-tag-chips"></div>
+      </div>
+      <div id="txn-ignore-wrap" class="hidden">
+        <label class="checkbox remember-wrap">
+          <input type="checkbox" name="ignored" id="txn-ignored">
+          {{ t('ignore_transaction') }}
+        </label>
+        <label id="txn-ignore-reason-wrap" class="hidden">
+          {{ t('ignore_reason') }}
+          <input type="text" name="ignore_reason" id="txn-ignore-reason" autocomplete="off">
+        </label>
       </div>
     </div>
     <div id="txn-split-panel" class="txn-split-panel hidden">

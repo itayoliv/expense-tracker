@@ -23,8 +23,12 @@
     sectorNoData: root.dataset.labelSectorNoData || "No sector data for this portfolio.",
     buyRemove: root.dataset.labelBuyRemove || "Remove",
     buyOverBudget: root.dataset.labelBuyOverBudget || "Allocated percentages total {percent}%, which is over 100%.",
+    buyOverBudgetCost: root.dataset.labelBuyOverBudgetCost || "Share costs total ${amount}, which is over the budget.",
     buyBudgetUsd: root.dataset.labelBuyBudgetUsd || "Budget in USD: ${amount}",
     buySelectStock: root.dataset.labelBuySelectStock || "Select a stock",
+    buyModePercent: root.dataset.labelBuyModePercent || "Budget %",
+    buyModeShares: root.dataset.labelBuyModeShares || "Shares",
+    buyModeHint: root.dataset.labelBuyModeHint || "Click to enter by budget % or by number of shares",
   };
 
   const LIVE_MS = 15000;
@@ -38,6 +42,7 @@
   let selectedPortfolio = "all";
   let selectedRange = "6mo";
   let buyCurrency = "ILS";
+  let buyInputMode = "shares";
   const buyStockCatalog = new Map();
 
   function formatNum(amount) {
@@ -87,6 +92,91 @@
     });
   }
 
+  function getBuyBudgetUsd() {
+    const budgetInput = document.getElementById("buy-budget-input");
+    const amount = Math.max(0, Number(budgetInput?.value) || 0);
+    const needsRate = buyCurrency === "ILS";
+    const hasRate = usdIls > 0;
+    return {
+      amount,
+      needsRate,
+      hasRate,
+      budgetUsd: needsRate ? (hasRate ? amount / usdIls : 0) : amount,
+    };
+  }
+
+  function isFractionalShares() {
+    return document.getElementById("buy-fractional")?.checked || false;
+  }
+
+  function normalizeShareCount(raw, fractional = isFractionalShares()) {
+    const n = Math.max(0, Number(raw) || 0);
+    if (fractional) return Math.floor((n + Number.EPSILON) * 10000) / 10000;
+    return Math.floor(n + Number.EPSILON);
+  }
+
+  function sharesFromAllocation(allocated, price, fractional = isFractionalShares()) {
+    if (!(price > 0)) return 0;
+    return normalizeShareCount(allocated / price, fractional);
+  }
+
+  function syncBuyPlannerModeUI() {
+    const table = document.getElementById("buy-planner-table");
+    if (table) table.dataset.inputMode = buyInputMode;
+    document.querySelectorAll(".buy-mode-toggle").forEach((btn) => {
+      const active = btn.dataset.mode === buyInputMode;
+      btn.classList.toggle("buy-mode-active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    const fractional = isFractionalShares();
+    document.querySelectorAll("#buy-planner-body tr[data-symbol]").forEach((row) => {
+      const pctInput = row.querySelector(".buy-percent-input");
+      const pctDisplay = row.querySelector(".buy-row-percent");
+      const sharesInput = row.querySelector(".buy-shares-input");
+      const sharesDisplay = row.querySelector(".buy-row-shares");
+      const percentMode = buyInputMode === "percent";
+      if (pctInput) pctInput.hidden = !percentMode;
+      if (pctDisplay) pctDisplay.hidden = percentMode;
+      if (sharesInput) {
+        sharesInput.hidden = percentMode;
+        sharesInput.step = fractional ? "0.0001" : "1";
+      }
+      if (sharesDisplay) sharesDisplay.hidden = !percentMode;
+    });
+  }
+
+  function setBuyInputMode(mode) {
+    if (mode !== "percent" && mode !== "shares") return;
+    if (mode === buyInputMode) {
+      syncBuyPlannerModeUI();
+      return;
+    }
+
+    const { budgetUsd } = getBuyBudgetUsd();
+    const fractional = isFractionalShares();
+    document.querySelectorAll("#buy-planner-body tr[data-symbol]").forEach((row) => {
+      const symbol = row.dataset.symbol || "";
+      const price = currentStockPrice(symbol);
+      const pctInput = row.querySelector(".buy-percent-input");
+      const sharesInput = row.querySelector(".buy-shares-input");
+      if (buyInputMode === "percent") {
+        const pct = Math.max(0, Number(pctInput?.value) || 0);
+        const allocated = budgetUsd * (pct / 100);
+        const shares = sharesFromAllocation(allocated, price, fractional);
+        if (sharesInput) sharesInput.value = fractional ? shares.toFixed(4) : String(shares);
+      } else {
+        const shares = normalizeShareCount(sharesInput?.value, fractional);
+        const cost = shares * price;
+        const pct = budgetUsd > 0 ? (cost / budgetUsd) * 100 : 0;
+        if (pctInput) pctInput.value = pct.toFixed(2);
+      }
+    });
+
+    buyInputMode = mode;
+    syncBuyPlannerModeUI();
+    updateBuyPlanner();
+  }
+
   function refreshBuyStockSelect() {
     const select = document.getElementById("buy-stock-select");
     const addBtn = document.getElementById("buy-stock-add");
@@ -119,15 +209,11 @@
   }
 
   function updateBuyPlanner() {
-    const budgetInput = document.getElementById("buy-budget-input");
     const body = document.getElementById("buy-planner-body");
-    if (!budgetInput || !body) return;
+    if (!body) return;
 
-    const amount = Math.max(0, Number(budgetInput.value) || 0);
-    const needsRate = buyCurrency === "ILS";
-    const hasRate = usdIls > 0;
-    const budgetUsd = needsRate ? (hasRate ? amount / usdIls : 0) : amount;
-    const fractional = document.getElementById("buy-fractional")?.checked || false;
+    const { needsRate, hasRate, budgetUsd } = getBuyBudgetUsd();
+    const fractional = isFractionalShares();
     const convertedEl = document.getElementById("buy-budget-usd");
     const rateEl = document.getElementById("buy-fx-rate");
     const rateError = document.getElementById("buy-fx-error");
@@ -150,25 +236,42 @@
       const symbol = row.dataset.symbol || "";
       const price = currentStockPrice(symbol);
       const pctInput = row.querySelector(".buy-percent-input");
-      const pct = Math.max(0, Number(pctInput?.value) || 0);
-      const allocated = budgetUsd * (pct / 100);
-      let shares = price > 0 ? allocated / price : 0;
-      shares = fractional
-        ? Math.floor((shares + Number.EPSILON) * 10000) / 10000
-        : Math.floor(shares + Number.EPSILON);
-      const cost = shares * price;
-      const leftover = allocated - cost;
+      const sharesInput = row.querySelector(".buy-shares-input");
+      let pct = 0;
+      let shares = 0;
+      let allocated = 0;
+      let cost = 0;
+      let leftover = 0;
+
+      if (buyInputMode === "shares") {
+        shares = normalizeShareCount(sharesInput?.value, fractional);
+        if (sharesInput && !fractional) sharesInput.value = String(shares);
+        cost = shares * price;
+        pct = budgetUsd > 0 ? (cost / budgetUsd) * 100 : 0;
+        allocated = cost;
+        leftover = 0;
+      } else {
+        pct = Math.max(0, Number(pctInput?.value) || 0);
+        allocated = budgetUsd * (pct / 100);
+        shares = sharesFromAllocation(allocated, price, fractional);
+        cost = shares * price;
+        leftover = allocated - cost;
+      }
 
       usedPercent += pct;
       totalCost += cost;
       const priceEl = row.querySelector(".buy-row-price");
       const allocatedEl = row.querySelector(".buy-row-allocated");
-      const sharesEl = row.querySelector(".buy-row-shares");
+      const percentDisplay = row.querySelector(".buy-row-percent");
+      const sharesDisplay = row.querySelector(".buy-row-shares");
       const costEl = row.querySelector(".buy-row-cost");
       const leftoverEl = row.querySelector(".buy-row-leftover");
-      if (priceEl) priceEl.textContent = `${usdSym}${formatNum(price)}`;
+      if (priceEl) priceEl.innerHTML = formatPlannerMoney(price, usdIls > 0);
       if (allocatedEl) allocatedEl.textContent = `${usdSym}${formatNum(allocated)}`;
-      if (sharesEl) sharesEl.textContent = fractional ? shares.toFixed(4) : String(shares);
+      if (percentDisplay) percentDisplay.textContent = `${pct.toFixed(2)}%`;
+      if (sharesDisplay) {
+        sharesDisplay.textContent = fractional ? shares.toFixed(4) : String(shares);
+      }
       if (costEl) costEl.textContent = `${usdSym}${formatNum(cost)}`;
       if (leftoverEl) leftoverEl.textContent = `${usdSym}${formatNum(leftover)}`;
     });
@@ -183,8 +286,14 @@
     if (leftoverPctEl) leftoverPctEl.textContent = `${leftoverPercent.toFixed(2)}%`;
     if (leftoverEl) leftoverEl.innerHTML = formatPlannerMoney(totalLeftover, needsRate);
     if (warningEl) {
-      warningEl.hidden = usedPercent <= 100;
-      warningEl.textContent = labels.buyOverBudget.replace("{percent}", usedPercent.toFixed(2));
+      const overPercent = buyInputMode === "percent" && usedPercent > 100;
+      const overCost = buyInputMode === "shares" && budgetUsd > 0 && totalCost > budgetUsd + 0.005;
+      warningEl.hidden = !overPercent && !overCost;
+      if (overPercent) {
+        warningEl.textContent = labels.buyOverBudget.replace("{percent}", usedPercent.toFixed(2));
+      } else if (overCost) {
+        warningEl.textContent = labels.buyOverBudgetCost.replace("{amount}", formatNum(totalCost));
+      }
     }
   }
 
@@ -195,6 +304,7 @@
 
     const row = document.createElement("tr");
     row.dataset.symbol = symbol;
+    const fractional = isFractionalShares();
 
     const symbolCell = document.createElement("td");
     const symbolStrong = document.createElement("strong");
@@ -209,8 +319,9 @@
 
     const priceCell = document.createElement("td");
     priceCell.className = "tx-amt buy-row-price";
+
     const percentCell = document.createElement("td");
-    percentCell.className = "tx-amt";
+    percentCell.className = "tx-amt buy-col-percent";
     const percentInput = document.createElement("input");
     percentInput.type = "number";
     percentInput.className = "buy-percent-input";
@@ -218,20 +329,33 @@
     percentInput.max = "100";
     percentInput.step = "0.01";
     percentInput.value = "0";
-    percentInput.setAttribute("aria-label", "%");
-    percentCell.appendChild(percentInput);
+    percentInput.setAttribute("aria-label", labels.buyModePercent);
+    percentInput.hidden = true;
+    const percentDisplay = document.createElement("span");
+    percentDisplay.className = "buy-row-percent";
+    percentCell.append(percentInput, percentDisplay);
 
-    const valueClasses = [
-      "buy-row-allocated",
-      "buy-row-shares",
-      "buy-row-cost",
-      "buy-row-leftover",
-    ];
-    const valueCells = valueClasses.map((className) => {
-      const cell = document.createElement("td");
-      cell.className = `tx-amt ${className}`;
-      return cell;
-    });
+    const allocatedCell = document.createElement("td");
+    allocatedCell.className = "tx-amt buy-row-allocated";
+
+    const sharesCell = document.createElement("td");
+    sharesCell.className = "tx-amt buy-col-shares";
+    const sharesInput = document.createElement("input");
+    sharesInput.type = "number";
+    sharesInput.className = "buy-shares-input";
+    sharesInput.min = "0";
+    sharesInput.step = fractional ? "0.0001" : "1";
+    sharesInput.value = "0";
+    sharesInput.setAttribute("aria-label", labels.buyModeShares);
+    const sharesDisplay = document.createElement("span");
+    sharesDisplay.className = "buy-row-shares";
+    sharesDisplay.hidden = true;
+    sharesCell.append(sharesInput, sharesDisplay);
+
+    const costCell = document.createElement("td");
+    costCell.className = "tx-amt buy-row-cost";
+    const leftoverCell = document.createElement("td");
+    leftoverCell.className = "tx-amt buy-row-leftover";
 
     const actionCell = document.createElement("td");
     const removeBtn = document.createElement("button");
@@ -240,9 +364,19 @@
     removeBtn.textContent = labels.buyRemove;
     actionCell.appendChild(removeBtn);
 
-    row.append(symbolCell, priceCell, percentCell, ...valueCells, actionCell);
+    row.append(
+      symbolCell,
+      priceCell,
+      percentCell,
+      allocatedCell,
+      sharesCell,
+      costCell,
+      leftoverCell,
+      actionCell
+    );
     body.appendChild(row);
     percentInput.addEventListener("input", updateBuyPlanner);
+    sharesInput.addEventListener("input", updateBuyPlanner);
     removeBtn.addEventListener("click", () => {
       row.remove();
       refreshBuyStockSelect();
@@ -250,6 +384,7 @@
       updateBuyPlanner();
     });
 
+    syncBuyPlannerModeUI();
     refreshBuyStockSelect();
     updateBuyPlannerVisibility();
     updateBuyPlanner();
@@ -265,13 +400,23 @@
   }
 
   function splitBuyPlannerEqually() {
-    const inputs = [...document.querySelectorAll("#buy-planner-body .buy-percent-input")];
-    if (!inputs.length) return;
-    const equal = Math.floor((100 / inputs.length) * 100) / 100;
-    inputs.forEach((input, index) => {
-      input.value = index === inputs.length - 1
-        ? (100 - equal * (inputs.length - 1)).toFixed(2)
-        : equal.toFixed(2);
+    const rows = [...document.querySelectorAll("#buy-planner-body tr[data-symbol]")];
+    if (!rows.length) return;
+    const { budgetUsd } = getBuyBudgetUsd();
+    const fractional = isFractionalShares();
+    const equal = Math.floor((100 / rows.length) * 100) / 100;
+    rows.forEach((row, index) => {
+      const pct = index === rows.length - 1
+        ? 100 - equal * (rows.length - 1)
+        : equal;
+      const pctInput = row.querySelector(".buy-percent-input");
+      const sharesInput = row.querySelector(".buy-shares-input");
+      if (pctInput) pctInput.value = pct.toFixed(2);
+      if (buyInputMode === "shares" && sharesInput) {
+        const price = currentStockPrice(row.dataset.symbol || "");
+        const shares = sharesFromAllocation(budgetUsd * (pct / 100), price, fractional);
+        sharesInput.value = fractional ? shares.toFixed(4) : String(shares);
+      }
     });
     updateBuyPlanner();
   }
@@ -280,14 +425,21 @@
     populateBuyStockCatalog();
     refreshBuyStockSelect();
     updateBuyPlannerVisibility();
+    syncBuyPlannerModeUI();
 
     document.getElementById("buy-budget-input")?.addEventListener("input", updateBuyPlanner);
-    document.getElementById("buy-fractional")?.addEventListener("change", updateBuyPlanner);
+    document.getElementById("buy-fractional")?.addEventListener("change", () => {
+      syncBuyPlannerModeUI();
+      updateBuyPlanner();
+    });
     document.getElementById("buy-stock-add")?.addEventListener("click", () => {
       const select = document.getElementById("buy-stock-select");
       if (select?.value) addBuyPlannerStock(select.value);
     });
     document.getElementById("buy-split-equally")?.addEventListener("click", splitBuyPlannerEqually);
+    document.querySelectorAll(".buy-mode-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => setBuyInputMode(btn.dataset.mode || "percent"));
+    });
     document.querySelectorAll("#buy-currency-tabs [data-currency]").forEach((btn) => {
       btn.addEventListener("click", () => {
         buyCurrency = btn.dataset.currency || "USD";

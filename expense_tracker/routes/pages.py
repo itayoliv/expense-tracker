@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import select
 from werkzeug.utils import secure_filename
 
@@ -175,9 +175,13 @@ def set_lang(lang: str):
 @bp.route("/import", methods=["POST"])
 def import_statement():
     current_lang = lang()
+    wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     uploads = [f for f in request.files.getlist("file") if f and f.filename]
     if not uploads:
-        flash(t(current_lang, "import_error", error="No file selected"), "error")
+        message = t(current_lang, "import_error", error="No file selected")
+        if wants_json:
+            return jsonify({"ok": False, "error": message, "added": 0, "skipped": 0}), 400
+        flash(message, "error")
         return redirect(url_for("pages.dashboard"))
 
     added = 0
@@ -197,15 +201,50 @@ def import_statement():
         except Exception as e:
             errors.append(f"{original}: {e}")
 
+    success_message = ""
     if added or skipped:
-        flash(
-            t(current_lang, "import_success", added=added, skipped=skipped),
-            "success",
-        )
+        if added == 0 and skipped > 0:
+            success_message = t(
+                current_lang, "import_all_duplicates", skipped=skipped
+            )
+        else:
+            success_message = t(
+                current_lang, "import_success", added=added, skipped=skipped
+            )
+        if not wants_json:
+            flash(success_message, "success")
     if errors:
-        flash(t(current_lang, "import_error", error="; ".join(errors)), "error")
+        error_message = t(current_lang, "import_error", error="; ".join(errors))
+        if wants_json:
+            return jsonify(
+                {
+                    "ok": bool(added or skipped),
+                    "added": added,
+                    "skipped": skipped,
+                    "message": success_message,
+                    "error": error_message,
+                    "errors": errors,
+                }
+            ), (200 if (added or skipped) else 400)
+        flash(error_message, "error")
     elif not added and not skipped:
-        flash(t(current_lang, "import_error", error="No file selected"), "error")
+        message = t(current_lang, "import_error", error="No file selected")
+        if wants_json:
+            return jsonify(
+                {"ok": False, "error": message, "added": 0, "skipped": 0}
+            ), 400
+        flash(message, "error")
+
+    if wants_json:
+        return jsonify(
+            {
+                "ok": True,
+                "added": added,
+                "skipped": skipped,
+                "message": success_message,
+                "errors": errors,
+            }
+        )
 
     return redirect(
         url_for("pages.dashboard", view=request.form.get("view", "expenses"))

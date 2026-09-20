@@ -41,6 +41,25 @@
     if (customInput && !readonly) customInput.value = "";
   }
 
+  function syncIgnoreReasonVisibility() {
+    const ignoredBox = document.getElementById("txn-ignored");
+    const reasonWrap = document.getElementById("txn-ignore-reason-wrap");
+    const reasonInput = document.getElementById("txn-ignore-reason");
+    const checked = Boolean(ignoredBox && ignoredBox.checked);
+    if (reasonWrap) reasonWrap.classList.toggle("hidden", !checked);
+    if (reasonInput && !checked) reasonInput.value = "";
+  }
+
+  function setIgnoreFields(visible, ignored, reason) {
+    const ignoreWrap = document.getElementById("txn-ignore-wrap");
+    const ignoredBox = document.getElementById("txn-ignored");
+    const reasonInput = document.getElementById("txn-ignore-reason");
+    if (ignoreWrap) ignoreWrap.classList.toggle("hidden", !visible);
+    if (ignoredBox) ignoredBox.checked = Boolean(ignored);
+    if (reasonInput) reasonInput.value = reason || "";
+    syncIgnoreReasonVisibility();
+  }
+
   function resetTxnForm() {
     if (txnForm) txnForm.reset();
     const idEl = document.getElementById("txn-id");
@@ -48,6 +67,7 @@
     if (txn.setSplitMode) txn.setSplitMode(false);
     if (btnSplitToggle) btnSplitToggle.classList.add("hidden");
     setTxnOriginalFieldsReadonly(false);
+    setIgnoreFields(false, false, "");
     setTagPickerSelection(document.getElementById("txn-tag-picker"), []);
   }
 
@@ -77,6 +97,7 @@
           data.tag_ids || []
         );
         bindTagPickers(document.getElementById("txn-tag-picker"));
+        setIgnoreFields(true, Boolean(data.ignored), data.ignore_reason || "");
         let isoDate = "";
         const parts = (data.date || "").split("/");
         if (parts.length === 3) {
@@ -145,6 +166,12 @@
   // Edit transaction
   bindTransactionEdits();
 
+  const ignoredBox = document.getElementById("txn-ignored");
+  if (ignoredBox && ignoredBox.dataset.bound !== "1") {
+    ignoredBox.dataset.bound = "1";
+    ignoredBox.addEventListener("change", syncIgnoreReasonVisibility);
+  }
+
   // Save add/edit/split
   if (txnForm) {
     txnForm.addEventListener("submit", async (e) => {
@@ -190,6 +217,21 @@
           apply_to_categorized: applyAll,
         };
         if (id) {
+          const ignored = document.getElementById("txn-ignored")
+            ? document.getElementById("txn-ignored").checked
+            : false;
+          const ignoreReason = document.getElementById("txn-ignore-reason")
+            ? document.getElementById("txn-ignore-reason").value.trim()
+            : "";
+          if (ignored && !ignoreReason) {
+            alert(
+              str(
+                "ignore_reason_required",
+                "A reason is required when ignoring a transaction."
+              )
+            );
+            return;
+          }
           body = {
             custom_description: document.getElementById("txn-custom-description")
               ? document.getElementById("txn-custom-description").value
@@ -199,6 +241,8 @@
             direction: document.getElementById("txn-direction").value,
             category_id: document.getElementById("txn-category").value || null,
             tag_ids: selectedTagIds(document.getElementById("txn-tag-picker")),
+            ignored,
+            ignore_reason: ignoreReason,
             remember_rule: remember,
             apply_to_categorized: applyAll,
           };

@@ -243,22 +243,78 @@ def test_discount_credit_card_parses_merchant_lines():
     assert all(r["source"] == "card" for r in rows)
 
 
-def test_dashboard_month_uses_purchase_date(client):
+def test_dashboard_month_uses_purchase_date_except_installments(client):
     from expense_tracker.services.importer import import_file
     import expense_tracker.db as db
 
     with db.get_session() as session:
         import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
 
-    # Statement billed in September, but purchases are in June/July — filter by purchase date.
+    # Installments (תשלום X מתוך Y) follow billing date; other rows stay on purchase date.
     september = client.get("/?date_from=2026-09-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" not in september
-    assert "סמארטאייר תל אביב בע" not in september
+    assert "דינמיקה רננים" in september
+    assert "סמארטאייר תל אביב בע" in september
     assert "APPLE.COM/BILL" not in september
 
     july = client.get("/?date_from=2026-07-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" in july
+    assert "דינמיקה רננים" not in july
     assert "APPLE.COM/BILL" in july
 
     june = client.get("/?date_from=2026-06-01&view=expenses").get_data(as_text=True)
-    assert "סמארטאייר תל אביב בע" in june
+    assert "סמארטאייר תל אביב בע" not in june
+
+
+def test_installment_uses_billing_date_regular_row_uses_purchase_date(client):
+    hdr = {"X-Requested-With": "XMLHttpRequest"}
+    created = client.post(
+        "/transactions",
+        json={
+            "description": "A I G ביטוח חובה",
+            "details": "תשלום 7 מתוך 12",
+            "amount": 241.33,
+            "direction": "debit",
+            "date": "2026-03-01",
+            "account": "4146",
+        },
+        headers=hdr,
+    )
+    assert created.status_code == 200
+    other = client.post(
+        "/transactions",
+        json={
+            "description": "Regular cafe",
+            "details": "",
+            "amount": 40,
+            "direction": "debit",
+            "date": "2026-03-15",
+            "account": "4146",
+        },
+        headers=hdr,
+    )
+    assert other.status_code == 200
+
+    from datetime import date
+
+    from expense_tracker.db import get_session
+    from expense_tracker.models import Transaction
+
+    with get_session() as session:
+        inst = session.get(Transaction, created.get_json()["id"])
+        cafe = session.get(Transaction, other.get_json()["id"])
+        inst.value_date = date(2026, 9, 2)
+        cafe.value_date = date(2026, 9, 2)
+        session.commit()
+
+    september = client.get(
+        "/?view=expenses&date_from=2026-09&date_to=2026-09"
+    ).get_data(as_text=True)
+    assert "A I G" in september
+    assert "02/09/26" in september
+    assert "Regular cafe" not in september
+
+    march = client.get(
+        "/?view=expenses&date_from=2026-03&date_to=2026-03"
+    ).get_data(as_text=True)
+    assert "A I G" not in march
+    assert "Regular cafe" in march
+    assert "15/03/26" in march

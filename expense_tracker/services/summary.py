@@ -3,14 +3,55 @@
 from __future__ import annotations
 
 import calendar
+import re
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract, select
+from sqlalchemy import case, extract, func, or_, select
 from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
 from expense_tracker.models import Transaction
+
+_INSTALLMENT_RE = re.compile(
+    r"(תשלום\s*\d+\s*מתוך\s*\d+)|(\binstallment\b)|(\bpayment\s*\d+\s*of\s*\d+)",
+    re.IGNORECASE,
+)
+
+
+def is_installment_details(text: str | None) -> bool:
+    """True for card payment-plan lines (e.g. תשלום 7 מתוך 12)."""
+    return bool(_INSTALLMENT_RE.search(text or ""))
+
+
+def is_installment(txn) -> bool:
+    return is_installment_details(getattr(txn, "details", None))
+
+
+def is_installment_sql():
+    details = func.coalesce(Transaction.details, "")
+    return or_(
+        details.like("%תשלום%מתוך%"),
+        details.ilike("%installment%"),
+        details.ilike("%payment%of%"),
+    )
+
+
+def display_date_column():
+    """Billing date for installments, otherwise purchase date."""
+    return case(
+        (
+            is_installment_sql(),
+            func.coalesce(Transaction.value_date, Transaction.txn_date),
+        ),
+        else_=Transaction.txn_date,
+    )
+
+
+def display_txn_date(txn) -> date:
+    if is_installment(txn) and getattr(txn, "value_date", None):
+        return txn.value_date
+    return txn.txn_date
 
 
 def parse_month(raw: str | None) -> tuple[int, int] | None:
@@ -93,15 +134,16 @@ def resolve_date_range(
 
 
 def available_months(session) -> list[str]:
+    shown = display_date_column()
     rows = session.execute(
         select(
-            extract("year", Transaction.txn_date),
-            extract("month", Transaction.txn_date),
+            extract("year", shown),
+            extract("month", shown),
         )
         .distinct()
         .order_by(
-            extract("year", Transaction.txn_date).desc(),
-            extract("month", Transaction.txn_date).desc(),
+            extract("year", shown).desc(),
+            extract("month", shown).desc(),
         )
     ).all()
     return [f"{int(y):04d}-{int(m):02d}" for y, m in rows if y and m]
@@ -110,22 +152,24 @@ def available_months(session) -> list[str]:
 def month_filter(query, month: tuple[int, int] | None):
     if month:
         y, m = month
+        shown = display_date_column()
         query = query.where(
-            extract("year", Transaction.txn_date) == y,
-            extract("month", Transaction.txn_date) == m,
+            extract("year", shown) == y,
+            extract("month", shown) == m,
         )
     return query
 
 
 def date_range_filter(query, date_from: date | None, date_to: date | None):
-    """Filter by transaction date (purchase date) inclusive range."""
+    """Filter by purchase date, except installment rows use billing date."""
     if not date_from and not date_to:
         return query
     start, end = resolve_date_range(date_from, date_to)
+    shown = display_date_column()
     if start:
-        query = query.where(Transaction.txn_date >= start)
+        query = query.where(shown >= start)
     if end:
-        query = query.where(Transaction.txn_date <= end)
+        query = query.where(shown <= end)
     return query
 
 
@@ -172,6 +216,10 @@ def split_accent(split_group: str) -> dict[str, str]:
     }
 
 
+def is_ignored(txn) -> bool:
+    return bool(getattr(txn, "ignored", False))
+
+
 def serialize_txn(lang: str, x) -> dict[str, Any]:
     tags = [
         {"id": tag.id, "name": tag.name, "color": tag.color}
@@ -185,11 +233,13 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "description": x.description,
         "details": x.details,
         "custom_description": getattr(x, "custom_description", "") or "",
-        "date": x.txn_date.strftime("%d/%m/%y"),
+        "date": display_txn_date(x).strftime("%d/%m/%y"),
         "amount": x.amount,
         "direction": x.direction,
         "category_id": x.category_id,
         "categorized_by": x.categorized_by or "",
+        "ignored": is_ignored(x),
+        "ignore_reason": getattr(x, "ignore_reason", "") or "",
         "tags": tags,
         **split_accent(getattr(x, "split_group", "") or ""),
         **txn_source_fields(lang, x),
@@ -243,6 +293,7 @@ def build_summary(
     groups: dict[str, dict[str, Any]] = {}
 
     for txn in filtered:
+        count_amount = not is_ignored(txn)
         if view == "bottom":
             key = "income" if txn.direction == "credit" else "expenses"
             if key not in groups:
@@ -257,7 +308,8 @@ def build_summary(
                     "transactions": [],
                     "category_id": None,
                 }
-            groups[key]["total"] += txn.amount
+            if count_amount:
+                groups[key]["total"] += txn.amount
             groups[key]["transactions"].append(txn)
             continue
 
@@ -273,7 +325,8 @@ def build_summary(
                     "transactions": [],
                     "category_id": None,
                 }
-            groups[cat_key]["total"] += txn.amount
+            if count_amount:
+                groups[cat_key]["total"] += txn.amount
             groups[cat_key]["transactions"].append(txn)
         else:
             cat = txn.category
@@ -289,7 +342,8 @@ def build_summary(
                     "category_id": cat.id,
                     "sort_order": cat.sort_order,
                 }
-            groups[key]["total"] += txn.amount
+            if count_amount:
+                groups[key]["total"] += txn.amount
             groups[key]["transactions"].append(txn)
 
     grand = sum(g["total"] for g in groups.values())
@@ -309,11 +363,11 @@ def build_summary(
     for g in categories:
         g["pct"] = round((g["total"] / grand * 100) if grand else 0, 2)
         if cat_sort == "value":
-            txn_key = lambda x: (x.amount, x.txn_date, x.id)
+            txn_key = lambda x: (x.amount, display_txn_date(x), x.id)
         else:
             txn_key = lambda x: (
                 (x.custom_description or x.description or "").casefold(),
-                x.txn_date,
+                display_txn_date(x),
                 x.id,
             )
         g["transactions"].sort(
@@ -323,13 +377,23 @@ def build_summary(
         g["txns"] = [serialize_txn(lang, x) for x in g["transactions"]]
         del g["transactions"]
 
-    expense_total = sum(t.amount for t in txns if t.direction == "debit")
-    income_total = sum(t.amount for t in txns if t.direction == "credit")
+    expense_total = sum(
+        t.amount for t in txns if t.direction == "debit" and not is_ignored(t)
+    )
+    income_total = sum(
+        t.amount for t in txns if t.direction == "credit" and not is_ignored(t)
+    )
 
     unsorted_expense = [
         serialize_txn(lang, x)
         for x in sorted(
-            [t for t in txns if t.direction == "debit" and t.category_id is None],
+            [
+                t
+                for t in txns
+                if t.direction == "debit"
+                and t.category_id is None
+                and not is_ignored(t)
+            ],
             key=lambda t: (t.value_date or t.txn_date, t.txn_date, t.id),
             reverse=True,
         )

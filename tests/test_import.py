@@ -7,15 +7,20 @@ def test_dashboard_includes_import_dropzone(client):
     html = client.get("/").get_data(as_text=True)
     assert 'id="import-dropzone"' in html
     assert 'id="import-file"' in html
+    assert 'id="import-file-list"' in html
+    assert 'id="import-result"' in html
     assert 'multiple' in html
     assert 'class="dropzone"' in html
     js = client.get("/static/js/import.js").get_data(as_text=True)
     assert "bindImportDropzone" in js
     assert "assignFiles" in js
+    assert "renderFileTable" in js
+    assert "X-Requested-With" in js
     css = client.get("/static/css/app.css").get_data(as_text=True)
     assert ".dropzone" in css
+    assert ".import-files-table" in css
+    assert ".import-result" in css
     assert ".empty-import" in css
-
 
 def test_empty_dashboard_shows_inline_dropzone(client):
     html = client.get("/").get_data(as_text=True)
@@ -316,6 +321,33 @@ def test_import_accepts_multiple_files(client):
     assert count == 3
     html = client.get("/?date_from=&date_to=").get_data(as_text=True)
     assert "דינמיקה רננים" in html
+
+
+def test_import_ajax_returns_json_without_flash(client):
+    from io import BytesIO
+
+    from tests.test_importer import _isracard_bytes
+
+    payload = _isracard_bytes()
+    res = client.post(
+        "/import",
+        data={
+            "view": "expenses",
+            "file": [(BytesIO(payload), "0423_09_2026.xlsx")],
+        },
+        content_type="multipart/form-data",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert res.status_code == 200
+    assert res.is_json
+    body = res.get_json()
+    assert body["ok"] is True
+    assert body["added"] == 3
+    assert body["skipped"] == 0
+    assert "Imported" in body["message"] or "יובאו" in body["message"]
+    # AJAX path should not leave flashes for a side toast.
+    with client.session_transaction() as sess:
+        assert "_flashes" not in sess
 
 
 def test_unsorted_banner_shows_details_newest_first(client):

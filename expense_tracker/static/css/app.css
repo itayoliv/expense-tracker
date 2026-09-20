@@ -505,6 +505,14 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   flex-shrink: 0;
 }
 
+.col-count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: start;
+  color: var(--muted);
+  width: 4.5rem;
+}
+
 .detail-row.hidden { display: none; }
 .detail-row td {
   background: #f8fafc;
@@ -575,6 +583,48 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   background: color-mix(in srgb, var(--split-accent, #0f766e) 18%, #fff);
   color: var(--split-accent, #0f766e);
   white-space: nowrap;
+}
+
+.ignored-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.txn-table tbody tr.txn-ignored {
+  opacity: 0.55;
+  color: var(--muted);
+}
+
+.txn-table tbody tr.txn-ignored .tx-amt,
+.txn-table tbody tr.txn-ignored .tx-custom-desc,
+.txn-table tbody tr.txn-ignored .tx-desc {
+  color: var(--muted);
+}
+
+.tx-ignore-reason {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+  font-style: italic;
+}
+
+#txn-ignore-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+#txn-ignore-wrap.hidden {
+  display: none;
 }
 
 .txn-table tbody tr.txn-split-part > td {
@@ -836,6 +886,74 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
 }
 .dropzone-types { color: #94a3b8; }
 
+.import-file-list {
+  margin-top: 0.85rem;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+}
+.import-files-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.import-files-table th,
+.import-files-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: start;
+  border-bottom: 1px solid #f1f5f9;
+}
+.import-files-table th {
+  font-weight: 600;
+  color: var(--muted);
+  background: #f8fafc;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.import-files-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.import-files-table .col-name {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+.import-files-table .col-size {
+  white-space: nowrap;
+  color: var(--muted);
+  text-align: end;
+}
+.import-files-table th.col-size {
+  text-align: end;
+}
+.import-result {
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.import-result.is-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+.import-result.is-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+.import-result.is-mixed {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
 .flash-wrap {
   position: fixed;
   top: 1rem;
@@ -1040,6 +1158,7 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   border-radius: 8px;
   background: var(--bg);
   overflow: hidden;
+  flex-shrink: 0;
 }
 .rule-group-header {
   display: flex;
@@ -1228,6 +1347,10 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   cursor: pointer;
   font: inherit;
   line-height: 1;
+}
+.tag-formula-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .tag-formula-remove {
   color: var(--danger, #dc2626);
@@ -1580,13 +1703,42 @@ html[dir="rtl"] .money-pair {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.buy-percent-input {
+.buy-percent-input,
+.buy-shares-input {
   width: 5.5rem;
   padding: 0.35rem 0.45rem;
   border: 1px solid var(--border);
   border-radius: 7px;
   font: inherit;
   text-align: end;
+}
+.buy-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.buy-mode-toggle:hover {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--bg) 70%, var(--border));
+}
+.buy-mode-toggle.buy-mode-active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+.buy-mode-toggle.buy-mode-active::after {
+  content: "✎";
+  font-size: 0.75em;
+  opacity: 0.85;
 }
 .buy-remove {
   border: 0;

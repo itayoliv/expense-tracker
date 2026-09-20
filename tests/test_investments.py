@@ -53,6 +53,10 @@ def test_investments_page_shows_cached_portfolios(client, monkeypatch):
     assert 'id="buy-stock-select"' in html
     assert 'id="buy-planner-table"' in html
     assert 'id="buy-planner-body"' in html
+    assert "Share price" in html or "מחיר למניה" in html
+    assert 'id="buy-th-percent"' in html
+    assert 'id="buy-th-shares"' in html
+    assert 'class="buy-mode-toggle buy-mode-active"' in html
     assert 'aria-controls="buy-planner-body-wrap"' in html
     assert 'class="collapsible-panel-body hidden" id="buy-planner-body-wrap"' in html
 
@@ -290,6 +294,42 @@ def test_holding_from_dom_uses_shares_and_rejects_junk():
     )
     assert junk is None
 
+    watch = _holding_from_row(
+        {
+            "symbol": "NVDA",
+            "name": "NVIDIA",
+            "quantity": "0",
+            "price": "110.25",
+            "change_pct": "1.1",
+            "market_value": "0",
+            "_from_dom": True,
+        }
+    )
+    assert watch is not None
+    assert watch["symbol"] == "NVDA"
+    assert watch["quantity"] == 0
+    assert watch["price"] == 110.25
+
+
+def test_normalize_holding_keeps_watchlist_zero_shares():
+    from expense_tracker.integrations.yahoo.portfolios import _normalize_holding
+
+    h = _normalize_holding(
+        {
+            "symbol": "MSFT",
+            "name": "Microsoft",
+            "quantity": 0,
+            "price": 420.5,
+            "change_pct": 0.5,
+            "market_value": 0,
+        }
+    )
+    assert h is not None
+    assert h["symbol"] == "MSFT"
+    assert h["quantity"] == 0
+    assert h["market_value"] == 0
+    assert h["price"] == 420.5
+
 
 def test_extract_ignores_bare_quotes():
     from expense_tracker.integrations.yahoo.portfolios import _extract_holdings_from_payload
@@ -310,15 +350,60 @@ def test_extract_ignores_bare_quotes():
                             "regularMarketPrice": 250,
                             "marketValue": 250,
                         }
-                    ]
+                    ],
+                    "securities": [
+                        {
+                            "symbol": "TSLA",
+                            "shortName": "Tesla",
+                            "regularMarketPrice": 250.5,
+                            "regularMarketChangePercent": -0.5,
+                        }
+                    ],
                 }
             ]
         },
     }
     holdings = _extract_holdings_from_payload(payload)
-    assert len(holdings) == 1
-    assert holdings[0]["symbol"] == "QQQM"
-    assert holdings[0]["quantity"] == 1
+    by_symbol = {h["symbol"]: h for h in holdings}
+    assert set(by_symbol) == {"QQQM", "TSLA"}
+    assert by_symbol["QQQM"]["quantity"] == 1
+    assert by_symbol["TSLA"]["quantity"] == 0
+    assert by_symbol["TSLA"]["price"] == 250.5
+
+
+def test_investments_page_includes_watchlist_symbols_in_buy_catalog(client, monkeypatch):
+    monkeypatch.setattr(
+        "expense_tracker.routes.investments.is_connected",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "expense_tracker.routes.investments.load_cache",
+        lambda: {
+            "updated_at": "2026-09-11T10:00:00+00:00",
+            "grand_total": 0,
+            "portfolios": [
+                {
+                    "id": "watch1",
+                    "name": "y watchlist",
+                    "total_value": 0,
+                    "holdings": [
+                        {
+                            "symbol": "AMD",
+                            "name": "AMD",
+                            "quantity": 0,
+                            "price": 160.0,
+                            "change_pct": 1.2,
+                            "market_value": 0,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    html = client.get("/investments").get_data(as_text=True)
+    assert 'data-symbol="AMD"' in html
+    assert "Watch" in html or "מעקב" in html
+    assert 'id="buy-stock-select"' in html
 
 
 def test_investments_history_endpoint(client, monkeypatch):

@@ -15,6 +15,9 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 - Add a stock buy planner with USD/NIS budgets, Yahoo USD/ILS conversion, percentage allocation across selected holdings, and whole or fractional share estimates.
 - Add an editable OneZero FX-cost comparison against Meitav Trade, Altshuler Shaham Trade, and major Israeli banks.
 - Save dated OneZero NIS conversions with Yahoo historical USD values and show cumulative savings versus Meitav Trade in the portfolios table.
+- Keep Yahoo **watchlist** symbols (0 shares) in portfolio data so they appear in the buy-planner stock dropdown.
+- Buy planner table shows **share price** (USD, with ILS when the Yahoo rate is available).
+- Buy planner: defaults to entering **share count**; click **Budget %** or **Shares** headers to switch input mode.
 
 ### Transaction tags
 
@@ -65,6 +68,31 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 - Split Yahoo Finance into `integrations/yahoo/` (`session`, `portfolios`, `quotes`, `history`).
 - Split bank/card import into `services/importer/` (`common`, `hapoalim`, `isracard`, `discount`).
 - Split dashboard transaction JS into `transactions.js` + `transactions-edit.js` / `transactions-split.js` / `transactions-banner.js`.
+
+---
+
+## 0.4.2+2 - 2026-09-14
+
+Build **2** under **0.4.2** (SemVer build metadata). Core version unchanged.
+
+### Ignore transactions
+
+- Edit modal: **Ignore this transaction** checkbox with a required reason.
+- Ignored rows stay visible in the dashboard table (gray) but are excluded from category totals, pie chart, footer net, tag sums, unsorted banner, GPT sort, and apply-to-similar rules.
+- New DB columns: `ignored`, `ignore_reason` (migrated on startup with a pre-migration backup).
+
+### Manage rules
+
+- Fix category group rows in **Manage rules** showing only color dots with missing names and counts (flex shrink was clipping the labels).
+
+### Dashboard
+
+- Show a **#** column on the expense table with the number of transactions in each category.
+- Enable the tag-sum **+** button only when the current scope has at least one tagged transaction.
+- Discard unfinished tag-sum formulas (created with **+** but no tag chosen) when the category is collapsed or the page reloads.
+- Hide the share **%** column on the Income view.
+- Import modal: show selected files in a table (name, date, size) and show added/skipped results inside the modal under the table instead of a side flash.
+- Credit-card **payment-plan** rows (`תשלום X מתוך Y`) filter and display by **billing date**; regular purchases and standing orders (`הוראת קבע`) stay on **purchase date**.
 
 ---
 
