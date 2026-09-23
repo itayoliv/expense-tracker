@@ -71,7 +71,7 @@ def _launch_fetch_session(playwright):
     """Headless browser using saved cookies — avoids locked profile directory."""
     if not is_connected():
         raise YahooFinanceError(
-            "Yahoo Finance is not connected. Run connect_yahoo.bat once to log in."
+            "Yahoo Finance is not connected. Run scripts\\connect_yahoo.bat once to log in."
         )
     last_error: Exception | None = None
     for channel in ("msedge", "chrome"):
@@ -157,7 +157,7 @@ def connect(timeout_seconds: int = 600) -> None:
 
         context.close()
         raise YahooFinanceError(
-            "Timed out waiting for login. Run connect_yahoo.bat again and finish signing in."
+            "Timed out waiting for login. Run scripts\\connect_yahoo.bat again and finish signing in."
         )
 
 

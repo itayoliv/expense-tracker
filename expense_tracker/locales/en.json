@@ -205,7 +205,7 @@
   "refresh_portfolios": "Refresh",
   "last_updated": "Last updated",
   "yahoo_not_connected": "Yahoo Finance is not connected yet.",
-  "yahoo_connect_hint": "Double-click connect_yahoo.bat, log in once in the browser window, then come back here and click Refresh.",
+  "yahoo_connect_hint": "Double-click scripts\\connect_yahoo.bat, log in once in the browser window, then come back here and click Refresh.",
   "yahoo_no_cache": "Connected, but no portfolio data yet. Click Refresh to load your stocks.",
   "no_holdings": "No holdings in this portfolio.",
   "watchlist_shares": "Watch",

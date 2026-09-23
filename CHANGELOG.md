@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build metadata (`+N`) marks interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2+1** is still release **0.4.2**, build **1**.
 
+## 0.4.2+3 - 2026-09-23
+
+Build **3** under **0.4.2** (SemVer build metadata). Core version unchanged.
+
+### Project layout
+
+- Move maintenance scripts out of the repo root: `scripts/upgrade.bat`, `scripts/connect_yahoo.bat`.
+- Add scratch-DB helpers under `scripts/dev/` (`run-dev.bat`, `reset-dev.bat`) using `data/dev/` (gitignored).
+- Keep only `install.bat` and `run.bat` in the project root for end users.
+- Print the active database path on startup.
+- Add a sample dashboard screenshot to the README (`docs/screenshot.png`).
+
 ## [Unreleased]
 
 Work in progress since **0.4.2**. Version not bumped yet — release when ready (planned: **0.5.0**).

@@ -74,7 +74,7 @@ if not exist "data" mkdir data
 echo.
 echo Install complete.
 echo Next: double-click run.bat to start the app.
-echo Optional: double-click connect_yahoo.bat to link Yahoo Finance portfolios.
+echo Optional: double-click scripts\connect_yahoo.bat to link Yahoo Finance portfolios.
 echo.
 pause
 endlocal

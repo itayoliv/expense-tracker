@@ -205,7 +205,7 @@
   "refresh_portfolios": "רענון",
   "last_updated": "עודכן לאחרונה",
   "yahoo_not_connected": "Yahoo Finance עדיין לא מחובר.",
-  "yahoo_connect_hint": "לחצו פעמיים על connect_yahoo.bat, התחברו פעם אחת בחלון הדפדפן, ואז חזרו לכאן ולחצו רענון.",
+  "yahoo_connect_hint": "לחצו פעמיים על scripts\\connect_yahoo.bat, התחברו פעם אחת בחלון הדפדפן, ואז חזרו לכאן ולחצו רענון.",
   "yahoo_no_cache": "מחוברים, אבל אין עדיין נתוני תיקים. לחצו רענון כדי לטעון את המניות.",
   "no_holdings": "אין אחזקות בתיק הזה.",
   "watchlist_shares": "מעקב",

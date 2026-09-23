@@ -1,8 +1,12 @@
 .venv/
 __pycache__/
 *.pyc
-data/*.db
-data/*.db-journal
+data/**/*.db
+data/**/*.db-journal
+data/**/*.db-wal
+data/**/*.db-shm
+data/backups/
+data/dev/
 data/openai_key.txt
 data/yahoo_profile/
 data/yahoo_portfolios.json

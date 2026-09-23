@@ -5,13 +5,14 @@ from __future__ import annotations
 import os
 
 from expense_tracker import create_app
-from expense_tracker.db import init_db
+from expense_tracker.db import DB_PATH, init_db
 
 app = create_app()
 
 
 def main() -> None:
     init_db()
+    print(f"Using database: {DB_PATH}")
     debug_raw = (os.environ.get("FLASK_DEBUG") or "1").strip().lower()
     debug = debug_raw not in ("0", "false", "off", "")
     # Reloader off by default so Settings → Close app can stop the process cleanly.

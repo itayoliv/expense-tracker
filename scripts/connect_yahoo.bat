@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 set "VENV_OK=0"
 if exist ".venv\Scripts\python.exe" (
@@ -9,7 +9,7 @@ if exist ".venv\Scripts\python.exe" (
 )
 if "%VENV_OK%"=="0" (
     echo Virtual environment not found or broken ^(common after copying from another PC^).
-    echo Run install.bat once before using connect_yahoo.bat.
+    echo Run install.bat once before using scripts\connect_yahoo.bat.
     echo.
     pause
     exit /b 1

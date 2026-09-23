@@ -2,6 +2,8 @@
 
 Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX files into SQLite and shows a bilingual expense dashboard with pie chart, expandable categories, and recategorization.
 
+![Expense Tracker dashboard](docs/screenshot.png)
+
 ## Requirements
 
 - Windows
@@ -31,7 +33,7 @@ Your data lives in `data/` (especially `data/expenses.db`) and settings in `.env
 **Zip install → newer zip**
 
 1. Download or unzip the **new** version into a new folder.
-2. Double-click **`upgrade.bat`** in the new folder.
+2. Double-click **`scripts\upgrade.bat`** in the new folder.
 3. Enter (or drag in) the path to your **old** install when prompted.
 4. The script copies `data/` and `.env` from the old folder, sets up `.venv`, and leaves the old folder untouched.
 5. Double-click **`run.bat`**. On first start the database migrates automatically (new tables/columns are added in place).
@@ -48,11 +50,11 @@ Your existing `data/` and `.env` stay in place; `install.bat` only refreshes dep
 
 **Automatic backups**
 
-Before any schema migration, the app copies `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` (keeps the last 5 `expenses-*.db` files). You can also create a backup anytime from **Settings → Back up database** (`expenses-manual-<timestamp>.db`). `upgrade.bat` also saves a full `data/` snapshot under `data/backups/pre-upgrade-<timestamp>/` before importing from the old install.
+Before any schema migration, the app copies `data/expenses.db` to `data/backups/expenses-<version>-<timestamp>.db` (keeps the last 5 `expenses-*.db` files). You can also create a backup anytime from **Settings → Back up database** (`expenses-manual-<timestamp>.db`). `scripts\upgrade.bat` also saves a full `data/` snapshot under `data/backups/pre-upgrade-<timestamp>/` before importing from the old install.
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2+2** (see [CHANGELOG.md](CHANGELOG.md)).
+This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2+3** (see [CHANGELOG.md](CHANGELOG.md)).
 
 - Bump `PATCH` for bug fixes and small internal improvements.
 - Bump `MINOR` for new features that keep existing behavior working.
@@ -63,12 +65,12 @@ Update `expense_tracker.__version__` and `CHANGELOG.md` together for each releas
 
 ## Connect Yahoo Finance (portfolios)
 
-1. After `install.bat`, double-click **`connect_yahoo.bat`**.
+1. After `install.bat`, double-click **`scripts\connect_yahoo.bat`**.
 2. A browser window opens — log in to Yahoo Finance manually.
 3. When your portfolios page loads, the session is saved locally (password is never stored).
 4. Start the app with `run.bat`, open **Investments** in the sidebar, and click **Refresh**.
 
-If the session expires later, run `connect_yahoo.bat` again.
+If the session expires later, run `scripts\connect_yahoo.bat` again.
 
 ## Manual setup
 
@@ -113,7 +115,9 @@ Credit-card files are imported as **one expense per merchant**. When card detail
   - `routes/` — HTTP blueprints
   - `templates/`, `static/` (including split `transactions-*.js` files), `locales/` — UI and translations
 - `data/` — SQLite DB, Yahoo session profile, and caches (gitignored)
-- `install.bat` / `run.bat` / `upgrade.bat` / `connect_yahoo.bat` — Windows install, launch, upgrade, and Yahoo login
+- `install.bat` / `run.bat` — Windows install and launch (project root)
+- `scripts/upgrade.bat` / `scripts/connect_yahoo.bat` — upgrade from an old install, Yahoo Finance login
+- `scripts/dev/run-dev.bat` / `scripts/dev/reset-dev.bat` — scratch DB for development (`data/dev/`)
 
 Personal bank exports under `files/`, the SQLite DB under `data/`, Yahoo session files, and `.env` are gitignored and should not be committed.
 

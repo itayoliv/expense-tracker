@@ -457,7 +457,7 @@ def fetch_portfolios() -> dict[str, Any]:
 
     if not is_connected():
         raise YahooFinanceError(
-            "Yahoo Finance is not connected. Run connect_yahoo.bat once to log in."
+            "Yahoo Finance is not connected. Run scripts\\connect_yahoo.bat once to log in."
         )
 
     with sync_playwright() as p:
@@ -469,7 +469,7 @@ def fetch_portfolios() -> dict[str, Any]:
             logged_in = _looks_logged_in(page)
             if not logged_in:
                 raise YahooFinanceError(
-                    "Yahoo session expired or not logged in. Run connect_yahoo.bat again."
+                    "Yahoo session expired or not logged in. Run scripts\\connect_yahoo.bat again."
                 )
 
             crumb = _get_crumb(page)

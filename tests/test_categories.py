@@ -297,7 +297,7 @@ def test_pie_chart_can_be_hidden(client):
     )
     assert created.status_code == 200
 
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08&date_to=2026-08").get_data(as_text=True)
     assert 'id="pie-chart"' in html
     assert 'id="setting-show-pie"' in html
     assert "checked" in html
@@ -306,12 +306,12 @@ def test_pie_chart_can_be_hidden(client):
     assert res.status_code == 200
     assert res.get_json()["show_pie"] is False
 
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08&date_to=2026-08").get_data(as_text=True)
     assert 'id="pie-chart"' not in html
     assert "content-grid no-chart" in html
     assert 'id="expense-table"' in html
 
     res = client.post("/api/settings/pie", json={"show_pie": True})
     assert res.status_code == 200
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/?date_from=2026-08&date_to=2026-08").get_data(as_text=True)
     assert 'id="pie-chart"' in html

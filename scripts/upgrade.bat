@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 echo ========================================
 echo  Expense Tracker - Upgrade from old copy
@@ -112,7 +112,7 @@ echo   - Data copied from: !OLD_DIR!
 echo   - Old install was NOT modified.
 echo   - On first start, the database migrates automatically.
 echo.
-echo Next: double-click run.bat to start the app.
+echo Next: double-click run.bat in the project root to start the app.
 echo.
 pause
 endlocal
