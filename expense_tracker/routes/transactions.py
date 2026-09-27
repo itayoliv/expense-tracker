@@ -91,16 +91,16 @@ def update_transaction(txn_id: int):
 
         if splits is not None:
             try:
-                # Optional date update before split uses current txn fields
+                part_date = None
                 if "date" in payload and payload["date"]:
-                    txn.txn_date = parse_txn_date(payload["date"])
-                    txn.value_date = txn.txn_date
+                    part_date = parse_txn_date(payload["date"])
                 result = split_transaction(
                     session,
                     txn,
                     splits,
                     remember=remember,
                     apply_all=apply_all,
+                    part_date=part_date,
                 )
                 session.commit()
             except Exception as e:

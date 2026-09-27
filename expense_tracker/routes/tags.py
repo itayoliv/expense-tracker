@@ -108,7 +108,12 @@ def update_tag(tag_id: int):
             return jsonify({"ok": False, "error": str(e)}), 400
 
         session.commit()
-        txns = [t for t in (tag.transactions or []) if not getattr(t, "ignored", False)]
+        txns = [
+            t
+            for t in (tag.transactions or [])
+            if not getattr(t, "ignored", False)
+            and not getattr(t, "is_split_parent", False)
+        ]
         return jsonify(
             {
                 "ok": True,
@@ -148,7 +153,12 @@ def tag_transactions(tag_id: int):
         if not tag:
             return jsonify({"ok": False, "error": "Not found"}), 404
         txns = sorted(
-            [t for t in (tag.transactions or []) if not getattr(t, "ignored", False)],
+            [
+                t
+                for t in (tag.transactions or [])
+                if not getattr(t, "ignored", False)
+                and not getattr(t, "is_split_parent", False)
+            ],
             key=lambda x: (
                 x.txn_date.toordinal() * -1,
                 x.id,

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy import select
 
 import expense_tracker.db as db
+from expense_tracker.db.migrations import _backfill_split_parents
 from expense_tracker.models import CategorizationRule, Transaction
+from expense_tracker.services.summary import build_summary
 
 
 def _id_by_name_en(client, name_en: str) -> int:
@@ -57,7 +61,10 @@ def test_split_creates_parts_and_keeps_categories(client):
     assert len(body["created_ids"]) == 2
 
     with db.get_session() as session:
-        assert session.get(Transaction, tid) is None
+        parent = session.get(Transaction, tid)
+        assert parent is not None
+        assert parent.is_split_parent is True
+        assert parent.split_group
         parts = list(
             session.scalars(
                 select(Transaction).where(Transaction.id.in_(body["created_ids"]))
@@ -118,6 +125,20 @@ def test_dashboard_marks_split_parts(client):
     assert "txn-split-part" in html
     assert "split-badge" in html or "Split" in html
     assert "--split-accent:" in html
+    assert f'data-txn-id="{tid}"' not in html
+
+    with db.get_session() as session:
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 31),
+        )
+    shopping = next(c for c in summary["categories"] if c["name"] == "Shopping")
+    assert shopping["total"] == 50
+    assert {tx["id"] for tx in shopping["txns"]} != {tid}
+    assert tid not in {tx["id"] for tx in shopping["txns"]}
 
 
 def test_split_amounts_must_match(client):
@@ -245,6 +266,171 @@ def test_split_remember_and_apply_per_description(client):
         shop_txn = session.get(Transaction, twin_shop)
         assert fuel_txn.category_id == fuel_id
         assert shop_txn.category_id == shopping_id
+
+
+def test_hidden_parent_cannot_split_again(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    tid = _add_txn(client, "PARENT", 50)
+    first = client.patch(
+        f"/transactions/{tid}",
+        json={
+            "splits": [
+                {"description": "Part A", "amount": 20, "category_id": shopping_id},
+                {"description": "Part B", "amount": 30, "category_id": shopping_id},
+            ]
+        },
+    )
+    assert first.status_code == 200
+    second = client.patch(
+        f"/transactions/{tid}",
+        json={
+            "splits": [
+                {"description": "X", "amount": 10, "category_id": shopping_id},
+                {"description": "Y", "amount": 40, "category_id": shopping_id},
+            ]
+        },
+    )
+    assert second.status_code == 400
+    assert "already split" in (second.get_json().get("error") or "").lower()
+
+
+def test_backfill_hides_reimported_original(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    with db.get_session() as session:
+        original = Transaction(
+            txn_date=date(2026, 8, 10),
+            value_date=date(2026, 8, 10),
+            description="BANK LINE",
+            details="",
+            reference="hapoalim-999",
+            amount=100,
+            direction="debit",
+            category_id=shopping_id,
+            source="bank",
+        )
+        session.add(original)
+        session.flush()
+        group = "abc123splitgroup"
+        for i, amount in enumerate((60, 40), start=1):
+            session.add(
+                Transaction(
+                    txn_date=date(2026, 8, 11),
+                    value_date=date(2026, 8, 11),
+                    description=f"Part {i}",
+                    details="BANK LINE",
+                    reference=f"hapoalim-999-split-{i}-1750000000.0",
+                    amount=amount,
+                    direction="debit",
+                    category_id=shopping_id,
+                    source="bank",
+                    split_group=group,
+                )
+            )
+        session.commit()
+        original_id = original.id
+
+    _backfill_split_parents()
+
+    with db.get_session() as session:
+        parent = session.get(Transaction, original_id)
+        assert parent.is_split_parent is True
+        assert parent.split_group == "abc123splitgroup"
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 31),
+        )
+    shopping = next(c for c in summary["categories"] if c["name"] == "Shopping")
+    assert shopping["total"] == 100
+    assert original_id not in {tx["id"] for tx in shopping["txns"]}
+
+
+def test_repeated_standing_order_hides_only_split_month(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    with db.get_session() as session:
+        june = Transaction(
+            txn_date=date(2026, 6, 10),
+            value_date=date(2026, 6, 10),
+            description="כלל חיים/בריאו",
+            details="עבור: ירון",
+            reference="628545",
+            amount=5431.36,
+            direction="debit",
+            account="12-628-654839",
+            category_id=shopping_id,
+            source="bank",
+        )
+        september = Transaction(
+            txn_date=date(2026, 9, 10),
+            value_date=date(2026, 9, 10),
+            description="כלל חיים/בריאו",
+            details="עבור: ירון",
+            reference="628545",
+            amount=5431.36,
+            direction="debit",
+            account="12-628-654839",
+            category_id=shopping_id,
+            source="bank",
+        )
+        session.add_all([june, september])
+        session.flush()
+        group = "standingordersplit"
+        session.add_all(
+            [
+                Transaction(
+                    txn_date=date(2026, 9, 10),
+                    value_date=date(2026, 9, 10),
+                    description="כלל חיים/בריאו",
+                    details="כלל חיים/בריאו · עבור: ירון",
+                    custom_description="חסכון",
+                    reference="628545-split-1-1789206485.656833",
+                    amount=4200,
+                    direction="debit",
+                    account="12-628-654839",
+                    category_id=shopping_id,
+                    source="bank",
+                    split_group=group,
+                ),
+                Transaction(
+                    txn_date=date(2026, 9, 10),
+                    value_date=date(2026, 9, 10),
+                    description="כלל חיים/בריאו",
+                    details="כלל חיים/בריאו · עבור: ירון",
+                    custom_description="חסכון לילדים",
+                    reference="628545-split-2-1789206485.656833",
+                    amount=1231.36,
+                    direction="debit",
+                    account="12-628-654839",
+                    category_id=shopping_id,
+                    source="bank",
+                    split_group=group,
+                ),
+            ]
+        )
+        session.commit()
+        june_id, september_id = june.id, september.id
+
+    with db.get_session() as session:
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 6, 1),
+            date_to=date(2026, 9, 30),
+        )
+    shopping = next(c for c in summary["categories"] if c["name"] == "Shopping")
+    ids = {tx["id"] for tx in shopping["txns"]}
+    assert june_id in ids
+    assert september_id not in ids
+    assert round(shopping["total"], 2) == 10862.72
+
+    _backfill_split_parents()
+    _backfill_split_parents()
+    with db.get_session() as session:
+        assert session.get(Transaction, june_id).is_split_parent is False
+        assert session.get(Transaction, september_id).is_split_parent is True
 
 
 def test_edit_modal_includes_split_controls(client):

@@ -90,6 +90,8 @@
   "remove_tag_formula": "Remove formula",
   "category": "Category",
   "txn_count": "#",
+  "txn_count_payments": "# / payments",
+  "txn_count_payments_hint": "Transactions / installment payments",
   "total_in_category": "Total in category",
   "pct_of_expenses": "Share of total (%)",
   "pct_of_income": "Share of income (%)",

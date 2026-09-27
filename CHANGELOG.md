@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 This project follows [Semantic Versioning](https://semver.org/).
 
-Build metadata (`+N`) marks interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2+1** is still release **0.4.2**, build **1**.
+Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
 ## 0.4.2+3 - 2026-09-23
 
@@ -18,9 +18,9 @@ Build **3** under **0.4.2** (SemVer build metadata). Core version unchanged.
 - Print the active database path on startup.
 - Add a sample dashboard screenshot to the README (`docs/screenshot.png`).
 
-## [Unreleased]
+## 0.4.2-3 - 2026-09-27
 
-Work in progress since **0.4.2**. Version not bumped yet — release when ready (planned: **0.5.0**).
+Build **3** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-3**.
 
 ### Investments
 
@@ -48,6 +48,11 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 
 - Keep sidebar brand as **Expense Tracker**; move app version directly below the brand on all pages (removed from under the dashboard page title).
 - **Manage rules**: group rules by category — click a category header to expand/collapse its rules (same pattern as tag groups).
+- Unsorted banner: add an **Ignore this transaction** checkbox (off by default) with a reason field.
+- Category table count column shows **transactions / installment payments** (e.g. `5 / 2`).
+- Expanded category transaction lists sort by **date, oldest first**.
+- Category sort is two buttons (**A–Z** and **Value**); the active sort is highlighted.
+- Sidebar **app version** shows the build number with a hyphen (`0.4.2-3`) instead of `+`.
 
 ### Date filters
 
@@ -61,6 +66,8 @@ Work in progress since **0.4.2**. Version not bumped yet — release when ready 
 - Fix split modal layout so split rows display correctly.
 - Add a **custom description** field for each split part.
 - Split part **description** is read-only and pre-filled from the original transaction.
+- Hide the original transaction after a split (keep it only as a hidden parent so a re-import cannot bring it back). Existing originals that still sit next to their split parts are hidden on the next startup.
+- When a standing order reuses the same bank reference and amount each month, hide only the month that was actually split.
 
 ### Upgrading and data migration
 

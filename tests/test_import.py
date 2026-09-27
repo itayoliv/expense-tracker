@@ -381,6 +381,8 @@ def test_unsorted_banner_shows_details_newest_first(client):
     assert 'id="unsorted-search"' in html
     assert 'class="u-remember"' in html
     assert 'class="u-apply-categorized"' in html
+    assert 'class="u-ignore"' in html
+    assert 'class="u-ignore" checked' not in html
     assert "u-update-btn" in html
     assert "Remember this categorization" in html or "זכור את הסיווג הזה" in html
     assert "Update" in html or "עדכון" in html

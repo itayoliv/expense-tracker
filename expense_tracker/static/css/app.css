@@ -342,11 +342,28 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
 }
 .u-remember-wrap,
-.u-apply-wrap {
+.u-apply-wrap,
+.u-ignore-wrap {
   font-size: 0.78rem;
   color: #9a3412;
   gap: 0.35rem;
   line-height: 1.25;
+}
+.u-ignore-reason-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: min(100%, 220px);
+}
+.u-ignore-reason-label {
+  font-size: 0.72rem;
+  color: #9a3412;
+}
+.u-ignore-reason {
+  padding: 0.3rem 0.45rem;
+  border-radius: 6px;
+  border: 1px solid #fdba74;
+  background: #fff;
 }
 
 .empty-import {
@@ -510,7 +527,12 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
   white-space: nowrap;
   text-align: start;
   color: var(--muted);
-  width: 4.5rem;
+  min-width: 7.5rem;
+}
+.count-frac {
+  display: inline-block;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .detail-row.hidden { display: none; }
@@ -1017,6 +1039,15 @@ html[dir="rtl"] .cat-row.open .chevron { transform: scaleX(-1) rotate(90deg); }
 .btn-cat-sort {
   font-size: 0.8rem;
   padding: 0.3rem 0.65rem;
+}
+.btn-cat-sort.is-selected {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-cat-sort.is-selected:hover {
+  background: var(--primary-hover);
+  filter: none;
 }
 .btn-cat-sort-direction {
   min-width: 2rem;

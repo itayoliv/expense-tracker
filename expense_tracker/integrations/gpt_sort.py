@@ -123,6 +123,7 @@ def apply_assignments(session: Session, assignments: dict[str, int]) -> int:
                 Transaction.category_id.is_(None),
                 Transaction.direction == "debit",
                 Transaction.ignored.is_(False),
+                Transaction.is_split_parent.is_(False),
                 func.lower(Transaction.description) == name_key,
             )
         ).all()
@@ -314,6 +315,7 @@ def sort_unsorted_expenses(session: Session, ask=None) -> dict[str, int]:
                 Transaction.category_id.is_(None),
                 Transaction.direction == "debit",
                 Transaction.ignored.is_(False),
+                Transaction.is_split_parent.is_(False),
             )
         ).all()
     )

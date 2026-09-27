@@ -51,7 +51,12 @@ def list_tag_payloads(session) -> list[dict[str, Any]]:
     tags = session.scalars(select(Tag).order_by(Tag.name)).all()
     payloads = []
     for tag in tags:
-        txns = [t for t in (tag.transactions or []) if not getattr(t, "ignored", False)]
+        txns = [
+            t
+            for t in (tag.transactions or [])
+            if not getattr(t, "ignored", False)
+            and not getattr(t, "is_split_parent", False)
+        ]
         payloads.append(
             tag_payload(
                 tag,

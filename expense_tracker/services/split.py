@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
@@ -10,6 +11,113 @@ from sqlalchemy.orm import Session
 
 from expense_tracker.services.categorizer import apply_description, remember_rule
 from expense_tracker.models import Category, Transaction
+
+_SPLIT_REF_RE = re.compile(r"^(?P<base>.+)-split-\d+-[\d.]+$")
+
+
+def split_part_base_ref(reference: str | None) -> str | None:
+    match = _SPLIT_REF_RE.match(reference or "")
+    return match.group("base") if match else None
+
+
+def resolve_split_parents(txns: list[Transaction]) -> list[Transaction]:
+    """Originals that still sit next to their split parts (e.g. after re-import)."""
+    groups: dict[str, list[Transaction]] = {}
+    for txn in txns:
+        group = (getattr(txn, "split_group", "") or "").strip()
+        if not group or getattr(txn, "is_split_parent", False):
+            continue
+        groups.setdefault(group, []).append(txn)
+
+    already_parented = {
+        (txn.split_group or "").strip()
+        for txn in txns
+        if getattr(txn, "is_split_parent", False)
+        and (txn.split_group or "").strip()
+    }
+
+    found: list[Transaction] = []
+    used_ids: set[int] = set()
+    for group_id, members in groups.items():
+        if len(members) < 2 or group_id in already_parented:
+            continue
+        parent = _match_split_parent(members, txns, used_ids)
+        if parent is not None:
+            found.append(parent)
+            used_ids.add(parent.id)
+    return found
+
+
+def _match_split_parent(
+    members: list[Transaction],
+    txns: list[Transaction],
+    used_ids: set[int],
+) -> Transaction | None:
+    total = round(sum(float(member.amount) for member in members), 2)
+    direction = members[0].direction
+    bases = {split_part_base_ref(member.reference) for member in members}
+    bases.discard(None)
+
+    def is_candidate(txn: Transaction) -> bool:
+        if getattr(txn, "is_split_parent", False) or txn.id in used_ids:
+            return False
+        if (getattr(txn, "split_group", "") or "").strip():
+            return False
+        if txn.direction != direction:
+            return False
+        return abs(round(float(txn.amount), 2) - total) <= 0.01
+
+    candidates = [txn for txn in txns if is_candidate(txn)]
+    if len(bases) == 1:
+        base = next(iter(bases))
+        ref_hits = [txn for txn in candidates if (txn.reference or "") == base]
+        if ref_hits:
+            candidates = ref_hits
+
+    if not candidates:
+        parent_descs = {
+            (member.details or "").split(" · ", 1)[0].strip()
+            for member in members
+            if (member.details or "").strip()
+        }
+        parent_descs.discard("")
+        account = (members[0].account or "").strip()
+        if parent_descs:
+            candidates = [
+                txn
+                for txn in txns
+                if is_candidate(txn)
+                and (txn.description or "").strip() in parent_descs
+                and (txn.account or "").strip() == account
+            ]
+
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    child_dates = {member.txn_date for member in members}
+    child_dates.update(
+        member.value_date for member in members if getattr(member, "value_date", None)
+    )
+    exact = [
+        txn
+        for txn in candidates
+        if txn.txn_date in child_dates
+        or getattr(txn, "value_date", None) in child_dates
+    ]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        return None
+
+    def date_distance(txn: Transaction) -> int:
+        return min(abs((txn.txn_date - child_date).days) for child_date in child_dates)
+
+    ranked = sorted(candidates, key=date_distance)
+    if date_distance(ranked[0]) < date_distance(ranked[1]):
+        return ranked[0]
+    return None
 
 
 def _parse_splits(raw: Any) -> list[dict[str, Any]]:
@@ -52,15 +160,18 @@ def split_transaction(
     *,
     remember: bool = False,
     apply_all: bool = False,
+    part_date=None,
 ) -> dict[str, Any]:
     """
-    Replace ``txn`` with multiple parts that sum to its amount.
+    Keep ``txn`` as a hidden parent and add parts that sum to its amount.
 
     Each part keeps its own description. Category defaults to the parent's
     category when a part does not specify one. Optional remember/apply runs
     per part description (same behavior as a normal edit).
     """
-    if (getattr(txn, "split_group", "") or "").strip():
+    if (getattr(txn, "split_group", "") or "").strip() or getattr(
+        txn, "is_split_parent", False
+    ):
         raise ValueError("This transaction was already split and cannot be split again")
 
     parts = _parse_splits(raw_splits)
@@ -92,11 +203,15 @@ def split_transaction(
     if parent_details and parent_details != parent_desc:
         detail_note = f"{parent_desc} · {parent_details}".strip(" ·")
 
+    child_date = part_date or txn.txn_date
+    child_value = part_date or txn.value_date
+    parent_tags = list(txn.tags or [])
+
     created: list[Transaction] = []
     for i, part in enumerate(parts):
         child = Transaction(
-            txn_date=txn.txn_date,
-            value_date=txn.value_date,
+            txn_date=child_date,
+            value_date=child_value,
             description=part["description"],
             details=detail_note,
             custom_description=part.get("custom_description") or "",
@@ -114,12 +229,15 @@ def split_transaction(
             is_manual=txn.is_manual,
         )
         session.add(child)
+        if parent_tags:
+            child.tags = list(parent_tags)
         created.append(child)
 
-    session.delete(txn)
+    txn.split_group = split_group
+    txn.is_split_parent = True
     session.flush()
 
-    exclude = {c.id for c in created}
+    exclude = {txn.id, *[c.id for c in created]}
     applied = 0
     for child in created:
         if not child.category_id:

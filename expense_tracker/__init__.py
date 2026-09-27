@@ -10,7 +10,7 @@ from flask import Flask
 from expense_tracker.db import init_db
 from expense_tracker.routes import register_blueprints
 
-__version__ = "0.4.2+3"
+__version__ = "0.4.2-3"
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 ROOT = PACKAGE_DIR.parent
@@ -29,7 +29,7 @@ def create_app() -> Flask:
 
     @app.context_processor
     def _inject_app_version():
-        return {"app_version": __version__}
+        return {"app_version": __version__.replace("+", "-", 1)}
 
     @app.before_request
     def _ensure_db():

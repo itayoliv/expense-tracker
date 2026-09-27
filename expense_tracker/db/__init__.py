@@ -88,6 +88,7 @@ from expense_tracker.db.backups import (  # noqa: E402
 )
 from expense_tracker.db.migrations import (  # noqa: E402
     _backfill_split_groups,
+    _backfill_split_parents,
     _has_legacy_schema,
     _migrate_schema,
     _schema_migration_pending,
@@ -141,6 +142,7 @@ __all__ = [
     "_schema_migration_pending",
     "_migrate_schema",
     "_backfill_split_groups",
+    "_backfill_split_parents",
     "_copy_db_file",
     "_backup_dir",
     "_prune_db_backups",

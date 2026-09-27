@@ -130,6 +130,14 @@
                 <input type="checkbox" class="u-apply-categorized">
                 {{ t('apply_to_categorized') }}
               </label>
+              <label class="checkbox u-ignore-wrap">
+                <input type="checkbox" class="u-ignore">
+                {{ t('ignore_transaction') }}
+              </label>
+              <label class="u-ignore-reason-wrap hidden">
+                <span class="u-ignore-reason-label">{{ t('ignore_reason') }}</span>
+                <input type="text" class="u-ignore-reason" value="" autocomplete="off">
+              </label>
             </div>
             <button type="button" class="btn primary u-update-btn" hidden>{{ t('unsorted_update') }}</button>
           </div>
@@ -209,8 +217,11 @@
             <div class="tag-formulas"></div>
           </div>
           <div class="category-sort-controls">
-            <button type="button" class="btn ghost btn-cat-sort" id="btn-cat-sort" data-mode="{{ cat_sort }}" title="{{ t('sort_categories_toggle') }}">
-              {% if cat_sort == 'value' %}{{ t('sort_categories_value') }}{% else %}{{ t('sort_categories_alpha') }}{% endif %}
+            <button type="button" class="btn ghost btn-cat-sort {% if cat_sort != 'value' %}is-selected{% endif %}" id="btn-cat-sort-alpha" data-mode="alpha" title="{{ t('sort_categories_alpha') }}" aria-pressed="{{ 'true' if cat_sort != 'value' else 'false' }}">
+              {{ t('sort_categories_alpha') }}
+            </button>
+            <button type="button" class="btn ghost btn-cat-sort {% if cat_sort == 'value' %}is-selected{% endif %}" id="btn-cat-sort-value" data-mode="value" title="{{ t('sort_categories_value') }}" aria-pressed="{{ 'true' if cat_sort == 'value' else 'false' }}">
+              {{ t('sort_categories_value') }}
             </button>
             <button type="button" class="btn ghost btn-cat-sort-direction" id="btn-cat-sort-direction" data-direction="{{ cat_sort_direction }}" title="{{ t('sort_descending') if cat_sort_direction == 'asc' else t('sort_ascending') }}" aria-label="{{ t('sort_descending') if cat_sort_direction == 'asc' else t('sort_ascending') }}">
               {% if cat_sort_direction == 'desc' %}↓{% else %}↑{% endif %}
@@ -221,7 +232,7 @@
           <thead>
             <tr>
               <th class="col-cat">{{ t('category') }}</th>
-              <th class="col-count">{{ t('txn_count') }}</th>
+              <th class="col-count" title="{{ t('txn_count_payments_hint') }}"><span class="count-frac">{{ t('txn_count_payments') }}</span></th>
               <th class="col-total">{{ t('total_in_category') }}</th>
               {% if view != 'income' %}
               <th class="col-pct">
@@ -241,7 +252,15 @@
                   <span class="cat-name">{{ cat.name }}</span>
                 </button>
               </td>
-              <td class="col-count">{{ cat.txns|length }}</td>
+              <td class="col-count">
+                {% set pays = namespace(n=0) %}
+                {% for tx in cat.txns %}
+                  {% if tx.is_installment or (tx.details and 'תשלום' in tx.details and 'מתוך' in tx.details) or (tx.details and 'installment' in tx.details|lower) %}
+                    {% set pays.n = pays.n + 1 %}
+                  {% endif %}
+                {% endfor %}
+                <span class="count-frac">{{ cat.txns|length }} / {{ pays.n }}</span>
+              </td>
               <td class="col-total">{{ money(cat.total) }}</td>
               {% if view != 'income' %}
               <td class="col-pct">{{ '%.2f'|format(cat.pct) }}%</td>

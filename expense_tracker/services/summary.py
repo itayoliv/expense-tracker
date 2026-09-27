@@ -12,6 +12,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
 from expense_tracker.models import Transaction
+from expense_tracker.services.split import resolve_split_parents
 
 _INSTALLMENT_RE = re.compile(
     r"(תשלום\s*\d+\s*מתוך\s*\d+)|(\binstallment\b)|(\bpayment\s*\d+\s*of\s*\d+)",
@@ -25,7 +26,13 @@ def is_installment_details(text: str | None) -> bool:
 
 
 def is_installment(txn) -> bool:
-    return is_installment_details(getattr(txn, "details", None))
+    if isinstance(txn, dict):
+        return is_installment_details(txn.get("details")) or is_installment_details(
+            txn.get("description")
+        )
+    return is_installment_details(getattr(txn, "details", None)) or is_installment_details(
+        getattr(txn, "description", None)
+    )
 
 
 def is_installment_sql():
@@ -220,6 +227,10 @@ def is_ignored(txn) -> bool:
     return bool(getattr(txn, "ignored", False))
 
 
+def is_split_parent(txn) -> bool:
+    return bool(getattr(txn, "is_split_parent", False))
+
+
 def serialize_txn(lang: str, x) -> dict[str, Any]:
     tags = [
         {"id": tag.id, "name": tag.name, "color": tag.color}
@@ -240,6 +251,7 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "categorized_by": x.categorized_by or "",
         "ignored": is_ignored(x),
         "ignore_reason": getattr(x, "ignore_reason", "") or "",
+        "is_installment": is_installment(x),
         "tags": tags,
         **split_accent(getattr(x, "split_group", "") or ""),
         **txn_source_fields(lang, x),
@@ -278,6 +290,12 @@ def build_summary(
     if start or end:
         base = date_range_filter(base, start, end)
     txns = list(session.scalars(base).unique().all())
+    hidden_parent_ids = {t.id for t in resolve_split_parents(txns)}
+    txns = [
+        t
+        for t in txns
+        if not is_split_parent(t) and t.id not in hidden_parent_ids
+    ]
 
     # Avoid double-counting: when card merchant details exist, hide bank card lumps
     if has_card_detail_imports(txns):
@@ -362,18 +380,11 @@ def build_summary(
         categories.append(unsorted_group)
     for g in categories:
         g["pct"] = round((g["total"] / grand * 100) if grand else 0, 2)
-        if cat_sort == "value":
-            txn_key = lambda x: (x.amount, display_txn_date(x), x.id)
-        else:
-            txn_key = lambda x: (
-                (x.custom_description or x.description or "").casefold(),
-                display_txn_date(x),
-                x.id,
-            )
         g["transactions"].sort(
-            key=txn_key,
-            reverse=cat_sort_direction == "desc",
+            key=lambda x: (display_txn_date(x), x.id),
         )
+        g["txn_count"] = len(g["transactions"])
+        g["payment_count"] = sum(1 for x in g["transactions"] if is_installment(x))
         g["txns"] = [serialize_txn(lang, x) for x in g["transactions"]]
         del g["transactions"]
 

@@ -90,6 +90,8 @@
   "remove_tag_formula": "הסרת נוסחה",
   "category": "קטגוריה",
   "txn_count": "מס׳",
+  "txn_count_payments": "תשלומים / מספר",
+  "txn_count_payments_hint": "תשלומים / מספר תנועות",
   "total_in_category": "סה\"כ בקטגוריה",
   "pct_of_expenses": "כמה זה מההוצאות (%)",
   "pct_of_income": "כמה זה מההכנסות (%)",

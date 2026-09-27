@@ -108,6 +108,31 @@ def test_ignored_excluded_from_summary_totals_but_visible(client):
     assert sum(summary["pie"]["values"]) == 30
 
 
+def test_unsorted_banner_can_ignore_transaction(client):
+    tid = _add_txn(client, "Transfer", 70)
+    html = client.get(
+        "/?view=expenses&date_from=2026-08-01&date_to=2026-08-31"
+    ).get_data(as_text=True)
+    assert 'class="u-ignore"' in html
+    assert 'class="u-ignore" checked' not in html
+    assert 'class="u-ignore-reason"' in html
+
+    res = client.patch(
+        f"/transactions/{tid}",
+        json={"ignored": True, "ignore_reason": "Internal transfer"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert res.status_code == 200
+    html = client.get(
+        "/?view=expenses&date_from=2026-08-01&date_to=2026-08-31"
+    ).get_data(as_text=True)
+    assert f'class="unsorted-item" data-id="{tid}"' not in html
+
+    js = client.get("/static/js/transactions-banner.js").get_data(as_text=True)
+    assert "u-ignore" in js
+    assert "ignored" in js
+
+
 def test_ignored_row_gray_on_dashboard_not_in_banner(client):
     keep = _add_txn(client, "Coffee", 30)
     ignored = _add_txn(client, "Transfer", 70)

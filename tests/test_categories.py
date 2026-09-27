@@ -67,6 +67,31 @@ def test_list_categories_includes_seeded_hebrew_defaults(client):
     assert all(isinstance(c["id"], int) for c in payload["categories"])
 
 
+def test_dashboard_has_separate_alpha_and_value_sort_buttons(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    client.post(
+        "/transactions",
+        json={
+            "description": "Shop",
+            "amount": 12,
+            "direction": "debit",
+            "date": "2026-08-10",
+            "category_id": shopping_id,
+        },
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    html = client.get("/?view=expenses&date_from=2026-08&date_to=2026-08").get_data(
+        as_text=True
+    )
+    assert 'id="btn-cat-sort-alpha"' in html
+    assert 'id="btn-cat-sort-value"' in html
+    assert 'btn-cat-sort-alpha" data-mode="alpha"' in html
+    assert "is-selected" in html
+    cats_js = client.get("/static/js/categories.js").get_data(as_text=True)
+    assert 'btn.dataset.mode === "value"' in cats_js
+    assert "is-selected" in cats_js
+
+
 def test_category_sort_mode_stores_mode_and_direction(client):
     res = client.post(
         "/api/categories/sort-mode",
@@ -126,7 +151,8 @@ def test_summary_sort_applies_to_categories_and_transactions(client):
         for category in summary["categories"]
         if category["category_id"] == category_a.id
     )
-    assert [txn["amount"] for txn in category_a_summary["txns"]] == [30, 10]
+    assert [txn["date"] for txn in category_a_summary["txns"]] == ["01/08/26", "02/08/26"]
+    assert [txn["amount"] for txn in category_a_summary["txns"]] == [10, 30]
 
 
 def test_create_category_persists(client):
@@ -315,3 +341,62 @@ def test_pie_chart_can_be_hidden(client):
     assert res.status_code == 200
     html = client.get("/?date_from=2026-08&date_to=2026-08").get_data(as_text=True)
     assert 'id="pie-chart"' in html
+
+
+def test_category_count_shows_payments(client):
+    shopping_id = _id_by_name_en(client, "Shopping")
+    hdr = {"X-Requested-With": "XMLHttpRequest"}
+    regular = client.post(
+        "/transactions",
+        json={
+            "description": "Store",
+            "amount": 80,
+            "direction": "debit",
+            "date": "2026-08-10",
+            "category_id": shopping_id,
+        },
+        headers=hdr,
+    )
+    payment = client.post(
+        "/transactions",
+        json={
+            "description": "Appliance",
+            "details": "תשלום 2 מתוך 6",
+            "amount": 120,
+            "direction": "debit",
+            "date": "2026-08-12",
+            "category_id": shopping_id,
+        },
+        headers=hdr,
+    )
+    assert regular.status_code == 200
+    assert payment.status_code == 200
+
+    with db.get_session() as session:
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 8, 1),
+            date_to=date(2026, 8, 31),
+        )
+    shopping = next(c for c in summary["categories"] if c["name"] == "Shopping")
+    assert shopping["txn_count"] == 2
+    assert shopping["payment_count"] == 1
+    assert [tx["date"] for tx in shopping["txns"]] == ["10/08/26", "12/08/26"]
+    assert shopping["txns"][0]["is_installment"] is False
+    assert shopping["txns"][1]["is_installment"] is True
+
+    html = client.get("/?view=expenses&date_from=2026-08&date_to=2026-08").get_data(
+        as_text=True
+    )
+    assert "# / payments" in html
+    assert "count-frac" in html
+    assert "2 / 1" in html
+
+    client.set_cookie("lang", "he")
+    he_html = client.get("/?view=expenses&date_from=2026-08&date_to=2026-08").get_data(
+        as_text=True
+    )
+    assert "תשלומים / מספר" in he_html
+    assert "2 / 1" in he_html

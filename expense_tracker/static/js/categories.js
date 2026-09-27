@@ -57,19 +57,13 @@
     return APP.catSortDirection === "desc" ? "desc" : "asc";
   }
 
-  function sortLabel(mode) {
-    if (mode === "value") {
-      return (APP.strings && APP.strings.sort_categories_value) || "Value";
-    }
-    return (APP.strings && APP.strings.sort_categories_alpha) || "A–Z";
-  }
-
   function syncSortButtons() {
     const mode = currentSortMode();
     const direction = currentSortDirection();
     document.querySelectorAll(".btn-cat-sort").forEach((btn) => {
-      btn.dataset.mode = mode;
-      btn.textContent = sortLabel(mode);
+      const selected = (btn.dataset.mode || "alpha") === mode;
+      btn.classList.toggle("is-selected", selected);
+      btn.setAttribute("aria-pressed", selected ? "true" : "false");
     });
     document.querySelectorAll(".btn-cat-sort-direction").forEach((btn) => {
       btn.dataset.direction = direction;
@@ -102,11 +96,9 @@
       if (btn.dataset.bound === "1") return;
       btn.dataset.bound = "1";
       btn.addEventListener("click", () => {
-        const current = btn.dataset.mode || currentSortMode();
-        setSortMode(
-          current === "value" ? "alpha" : "value",
-          currentSortDirection()
-        );
+        const mode = btn.dataset.mode === "value" ? "value" : "alpha";
+        if (mode === currentSortMode()) return;
+        setSortMode(mode, currentSortDirection());
       });
     });
     document.querySelectorAll(".btn-cat-sort-direction").forEach((btn) => {

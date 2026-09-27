@@ -80,6 +80,7 @@ def _schema_migration_pending() -> bool:
             "categorized_by",
             "custom_description",
             "split_group",
+            "is_split_parent",
             "ignored",
             "ignore_reason",
         ):
@@ -170,9 +171,18 @@ def _migrate_schema() -> None:
                 "ALTER TABLE transactions "
                 "ADD COLUMN split_group VARCHAR(64) NOT NULL DEFAULT ''"
             )
+    txn_cols = _table_columns("transactions")
+    if txn_cols and "is_split_parent" not in txn_cols:
+        with dbstate.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE transactions "
+                "ADD COLUMN is_split_parent BOOLEAN NOT NULL DEFAULT 0"
+            )
+    txn_cols = _table_columns("transactions")
+    if txn_cols and "split_group" in txn_cols:
         _backfill_split_groups()
-    elif txn_cols and "split_group" in txn_cols:
-        _backfill_split_groups()
+    if txn_cols and "is_split_parent" in txn_cols:
+        _backfill_split_parents()
 
 
 def _backfill_split_groups() -> None:
@@ -202,6 +212,43 @@ def _backfill_split_groups() -> None:
             group_id = uuid4().hex
             for txn in members:
                 txn.split_group = group_id
+            changed = True
+        if changed:
+            session.commit()
+
+
+def _backfill_split_parents() -> None:
+    """Hide original rows that still sit next to their split parts."""
+    import expense_tracker.db as dbstate
+    from expense_tracker.models import Transaction
+    from expense_tracker.services.split import _match_split_parent
+
+    if dbstate.engine is None or dbstate.SessionLocal is None:
+        return
+    with dbstate.SessionLocal() as session:
+        rows = list(session.scalars(select(Transaction)).all())
+        groups: dict[str, list] = {}
+        for txn in rows:
+            group = (txn.split_group or "").strip()
+            if group and not getattr(txn, "is_split_parent", False):
+                groups.setdefault(group, []).append(txn)
+        already_parented = {
+            (txn.split_group or "").strip()
+            for txn in rows
+            if getattr(txn, "is_split_parent", False)
+            and (txn.split_group or "").strip()
+        }
+        used: set[int] = set()
+        changed = False
+        for group_id, members in groups.items():
+            if len(members) < 2 or group_id in already_parented:
+                continue
+            parent = _match_split_parent(members, rows, used)
+            if parent is None:
+                continue
+            parent.is_split_parent = True
+            parent.split_group = group_id
+            used.add(parent.id)
             changed = True
         if changed:
             session.commit()

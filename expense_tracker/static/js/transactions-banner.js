@@ -14,6 +14,9 @@
       const sel = item.querySelector(".u-cat-select");
       const rememberBox = item.querySelector(".u-remember");
       const applyBox = item.querySelector(".u-apply-categorized");
+      const ignoreBox = item.querySelector(".u-ignore");
+      const ignoreReasonWrap = item.querySelector(".u-ignore-reason-wrap");
+      const ignoreReasonInput = item.querySelector(".u-ignore-reason");
       const customInput = item.querySelector(".u-custom-desc-input");
       const tagPicker = item.querySelector(".u-tag-picker");
       const updateBtn = item.querySelector(".u-update-btn");
@@ -21,20 +24,31 @@
 
       bindTagPickers(item);
 
+      const syncIgnoreReason = () => {
+        const checked = Boolean(ignoreBox?.checked);
+        if (ignoreReasonWrap) ignoreReasonWrap.classList.toggle("hidden", !checked);
+        if (ignoreReasonInput && !checked) ignoreReasonInput.value = "";
+      };
+
       const initial = {
         category: sel.value || "",
         remember: Boolean(rememberBox?.checked),
         applyAll: Boolean(applyBox?.checked),
+        ignored: Boolean(ignoreBox?.checked),
+        ignoreReason: ignoreReasonInput ? ignoreReasonInput.value.trim() : "",
         customDescription: customInput ? customInput.value.trim() : "",
         tagIds: selectedTagIds(tagPicker).join(","),
       };
 
       const syncUpdateBtn = () => {
         const customDescription = customInput ? customInput.value.trim() : "";
+        const ignoreReason = ignoreReasonInput ? ignoreReasonInput.value.trim() : "";
         const dirty =
           (sel.value || "") !== initial.category ||
           Boolean(rememberBox?.checked) !== initial.remember ||
           Boolean(applyBox?.checked) !== initial.applyAll ||
+          Boolean(ignoreBox?.checked) !== initial.ignored ||
+          ignoreReason !== initial.ignoreReason ||
           customDescription !== initial.customDescription ||
           selectedTagIds(tagPicker).join(",") !== initial.tagIds;
         updateBtn.hidden = !dirty;
@@ -43,6 +57,11 @@
       sel.addEventListener("change", syncUpdateBtn);
       rememberBox?.addEventListener("change", syncUpdateBtn);
       applyBox?.addEventListener("change", syncUpdateBtn);
+      ignoreBox?.addEventListener("change", () => {
+        syncIgnoreReason();
+        syncUpdateBtn();
+      });
+      ignoreReasonInput?.addEventListener("input", syncUpdateBtn);
       customInput?.addEventListener("input", syncUpdateBtn);
       tagPicker?.addEventListener("change", syncUpdateBtn);
 
@@ -52,13 +71,24 @@
         const custom_description = customInput ? customInput.value.trim() : "";
         const customChanged = custom_description !== initial.customDescription;
         const tagsChanged = selectedTagIds(tagPicker).join(",") !== initial.tagIds;
-        if (!category_id && !customChanged && !tagsChanged) return;
+        const ignored = Boolean(ignoreBox?.checked);
+        const ignoreReason = ignoreReasonInput ? ignoreReasonInput.value.trim() : "";
+        if (ignored && !ignoreReason) {
+          alert(
+            (APP.strings && APP.strings.ignore_reason_required) ||
+              "A reason is required when ignoring a transaction."
+          );
+          return;
+        }
+        if (!category_id && !customChanged && !tagsChanged && !ignored) return;
         updateBtn.disabled = true;
         const body = {
           custom_description,
           tag_ids: selectedTagIds(tagPicker),
           remember_rule: Boolean(rememberBox?.checked),
           apply_to_categorized: Boolean(applyBox?.checked),
+          ignored,
+          ignore_reason: ignoreReason,
         };
         if (category_id) body.category_id = category_id;
         const res = await fetch(`/transactions/${id}`, {
