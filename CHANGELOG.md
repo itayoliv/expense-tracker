@@ -12,7 +12,8 @@ Build **4** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2
 
 ### Transactions
 
-- Installments (`תשלום X מתוך Y`) now use the purchase date (`תאריך רכישה`) for the date column and the month filter, like every other transaction. Previously they showed the statement charge date, so all installments in one export shared a single date such as `02/10/26`.
+- Each installment slice (`תשלום X מתוך Y`) is now dated from its purchase date (`תאריך רכישה`) plus X-1 months. Payment 1 keeps the purchase date, payment 2 moves one month later, and so on, so each payment of a plan appears in its own month. When the target month is shorter, the day is set to that month's last day (a purchase on 31/08/26 has payment 2 on 30/09/26). Previously every slice showed the statement charge date, so all installments in one export shared a single date such as `02/10/26`.
+- The slice date is saved on each transaction in a new `installment_date` column and drives both the date column and the month filter. Existing installments are dated automatically on first start.
 - Transactions marked **pending** (`עסקאות שטרם נקלטו`) are no longer inserted. They are counted as skipped. The final statement row, which has a voucher number, is imported as usual.
 
 ## 0.4.2+3 - 2026-09-23

@@ -17,8 +17,11 @@ from sqlalchemy import (
     Table,
     Text,
     UniqueConstraint,
+    event,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from expense_tracker.services.installments import installment_date_for
 
 
 class Base(DeclarativeBase):
@@ -121,6 +124,7 @@ class Transaction(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     txn_date: Mapped[date] = mapped_column(Date, nullable=False)
     value_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    installment_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     description: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     details: Mapped[str] = mapped_column(Text, nullable=False, default="")
     custom_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
@@ -148,6 +152,14 @@ class Transaction(Base):
     category: Mapped[Optional[Category]] = relationship(back_populates="transactions")
     tags: Mapped[list[Tag]] = relationship(
         secondary=transaction_tags, back_populates="transactions"
+    )
+
+
+@event.listens_for(Transaction, "before_insert")
+@event.listens_for(Transaction, "before_update")
+def _sync_installment_date(mapper, connection, target) -> None:
+    target.installment_date = installment_date_for(
+        target.txn_date, target.details, target.description
     )
 
 

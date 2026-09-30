@@ -298,27 +298,32 @@ def test_discount_credit_card_parses_merchant_lines():
     assert all(r["source"] == "card" for r in rows)
 
 
-def test_dashboard_month_uses_purchase_date_for_installments_too(client):
+def test_dashboard_month_uses_installment_slice_date(client):
     from expense_tracker.services.importer import import_file
     import expense_tracker.db as db
 
     with db.get_session() as session:
         import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
 
-    # Installments (תשלום X מתוך Y) stay on תאריך רכישה like every other row.
+    # Slice N of a plan is dated תאריך רכישה + (N - 1) months; other rows keep תאריך רכישה.
     september = client.get("/?date_from=2026-09-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" not in september
+    assert "דינמיקה רננים" in september
+    assert "06/09/26" in september
     assert "סמארטאייר תל אביב בע" not in september
 
+    august = client.get("/?date_from=2026-08-01&view=expenses").get_data(as_text=True)
+    assert "סמארטאייר תל אביב בע" in august
+    assert "11/08/26" in august
+
     july = client.get("/?date_from=2026-07-01&view=expenses").get_data(as_text=True)
-    assert "דינמיקה רננים" in july
+    assert "דינמיקה רננים" not in july
     assert "APPLE.COM/BILL" in july
 
     june = client.get("/?date_from=2026-06-01&view=expenses").get_data(as_text=True)
-    assert "סמארטאייר תל אביב בע" in june
+    assert "סמארטאייר תל אביב בע" not in june
 
 
-def test_installment_and_regular_row_both_use_purchase_date(client):
+def test_installment_uses_slice_date_regular_row_uses_purchase_date(client):
     hdr = {"X-Requested-With": "XMLHttpRequest"}
     created = client.post(
         "/transactions",
@@ -362,13 +367,13 @@ def test_installment_and_regular_row_both_use_purchase_date(client):
     september = client.get(
         "/?view=expenses&date_from=2026-09&date_to=2026-09"
     ).get_data(as_text=True)
-    assert "A I G" not in september
+    assert "A I G" in september
+    assert "01/09/26" in september
     assert "Regular cafe" not in september
 
     march = client.get(
         "/?view=expenses&date_from=2026-03&date_to=2026-03"
     ).get_data(as_text=True)
-    assert "A I G" in march
-    assert "01/03/26" in march
+    assert "A I G" not in march
     assert "Regular cafe" in march
     assert "15/03/26" in march

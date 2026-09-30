@@ -54,7 +54,7 @@ Before any schema migration, the app copies `data/expenses.db` to `data/backups/
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2-3** (see [CHANGELOG.md](CHANGELOG.md)).
+This project uses [Semantic Versioning](https://semver.org/). Current version: **0.4.2-4** (see [CHANGELOG.md](CHANGELOG.md)).
 
 - Bump `PATCH` for bug fixes and small internal improvements.
 - Bump `MINOR` for new features that keep existing behavior working.

@@ -3,45 +3,28 @@
 from __future__ import annotations
 
 import calendar
-import re
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
 from expense_tracker.models import Transaction
-from expense_tracker.services.split import resolve_split_parents
-
-_INSTALLMENT_RE = re.compile(
-    r"(תשלום\s*\d+\s*מתוך\s*\d+)|(\binstallment\b)|(\bpayment\s*\d+\s*of\s*\d+)",
-    re.IGNORECASE,
+from expense_tracker.services.installments import (  # noqa: F401 — re-exported
+    is_installment,
+    is_installment_details,
 )
-
-
-def is_installment_details(text: str | None) -> bool:
-    """True for card payment-plan lines (e.g. תשלום 7 מתוך 12)."""
-    return bool(_INSTALLMENT_RE.search(text or ""))
-
-
-def is_installment(txn) -> bool:
-    if isinstance(txn, dict):
-        return is_installment_details(txn.get("details")) or is_installment_details(
-            txn.get("description")
-        )
-    return is_installment_details(getattr(txn, "details", None)) or is_installment_details(
-        getattr(txn, "description", None)
-    )
+from expense_tracker.services.split import resolve_split_parents
 
 
 def display_date_column():
-    """Purchase date (תאריך רכישה), including for installment rows."""
-    return Transaction.txn_date
+    """Installment slice date, otherwise purchase date (תאריך רכישה)."""
+    return func.coalesce(Transaction.installment_date, Transaction.txn_date)
 
 
 def display_txn_date(txn) -> date:
-    return txn.txn_date
+    return getattr(txn, "installment_date", None) or txn.txn_date
 
 
 def parse_month(raw: str | None) -> tuple[int, int] | None:
@@ -151,7 +134,7 @@ def month_filter(query, month: tuple[int, int] | None):
 
 
 def date_range_filter(query, date_from: date | None, date_to: date | None):
-    """Filter by purchase date."""
+    """Filter by purchase date, or the slice date for installment rows."""
     if not date_from and not date_to:
         return query
     start, end = resolve_date_range(date_from, date_to)

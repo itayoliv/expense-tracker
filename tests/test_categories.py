@@ -361,7 +361,7 @@ def test_category_count_shows_payments(client):
         "/transactions",
         json={
             "description": "Appliance",
-            "details": "תשלום 2 מתוך 6",
+            "details": "תשלום 1 מתוך 6",
             "amount": 120,
             "direction": "debit",
             "date": "2026-08-12",

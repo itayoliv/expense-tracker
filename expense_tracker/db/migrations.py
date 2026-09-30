@@ -83,6 +83,7 @@ def _schema_migration_pending() -> bool:
             "is_split_parent",
             "ignored",
             "ignore_reason",
+            "installment_date",
         ):
             if col not in txn_cols:
                 return True
@@ -179,10 +180,18 @@ def _migrate_schema() -> None:
                 "ADD COLUMN is_split_parent BOOLEAN NOT NULL DEFAULT 0"
             )
     txn_cols = _table_columns("transactions")
+    if txn_cols and "installment_date" not in txn_cols:
+        with dbstate.engine.begin() as conn:
+            conn.exec_driver_sql(
+                "ALTER TABLE transactions ADD COLUMN installment_date DATE"
+            )
+    txn_cols = _table_columns("transactions")
     if txn_cols and "split_group" in txn_cols:
         _backfill_split_groups()
     if txn_cols and "is_split_parent" in txn_cols:
         _backfill_split_parents()
+    if txn_cols and "installment_date" in txn_cols:
+        _backfill_installment_dates()
 
 
 def _backfill_split_groups() -> None:
@@ -213,6 +222,25 @@ def _backfill_split_groups() -> None:
             for txn in members:
                 txn.split_group = group_id
             changed = True
+        if changed:
+            session.commit()
+
+
+def _backfill_installment_dates() -> None:
+    """Date each installment slice from its purchase date and payment number."""
+    import expense_tracker.db as dbstate
+    from expense_tracker.models import Transaction
+    from expense_tracker.services.installments import installment_date_for
+
+    if dbstate.engine is None or dbstate.SessionLocal is None:
+        return
+    with dbstate.SessionLocal() as session:
+        changed = False
+        for txn in session.scalars(select(Transaction)).all():
+            expected = installment_date_for(txn.txn_date, txn.details, txn.description)
+            if txn.installment_date != expected:
+                txn.installment_date = expected
+                changed = True
         if changed:
             session.commit()
 
