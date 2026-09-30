@@ -6,6 +6,15 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.4.2-4 - 2026-09-30
+
+Build **4** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-4**.
+
+### Transactions
+
+- Installments (`תשלום X מתוך Y`) now use the purchase date (`תאריך רכישה`) for the date column and the month filter, like every other transaction. Previously they showed the statement charge date, so all installments in one export shared a single date such as `02/10/26`.
+- Transactions marked **pending** (`עסקאות שטרם נקלטו`) are no longer inserted. They are counted as skipped. The final statement row, which has a voucher number, is imported as usual.
+
 ## 0.4.2+3 - 2026-09-23
 
 Build **3** under **0.4.2** (SemVer build metadata). Core version unchanged.

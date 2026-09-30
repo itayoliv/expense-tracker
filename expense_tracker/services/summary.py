@@ -7,7 +7,7 @@ import re
 from datetime import date
 from typing import Any
 
-from sqlalchemy import case, extract, func, or_, select
+from sqlalchemy import extract, select
 from sqlalchemy.orm import joinedload, selectinload
 
 from expense_tracker.i18n import category_name, t
@@ -35,29 +35,12 @@ def is_installment(txn) -> bool:
     )
 
 
-def is_installment_sql():
-    details = func.coalesce(Transaction.details, "")
-    return or_(
-        details.like("%תשלום%מתוך%"),
-        details.ilike("%installment%"),
-        details.ilike("%payment%of%"),
-    )
-
-
 def display_date_column():
-    """Billing date for installments, otherwise purchase date."""
-    return case(
-        (
-            is_installment_sql(),
-            func.coalesce(Transaction.value_date, Transaction.txn_date),
-        ),
-        else_=Transaction.txn_date,
-    )
+    """Purchase date (תאריך רכישה), including for installment rows."""
+    return Transaction.txn_date
 
 
 def display_txn_date(txn) -> date:
-    if is_installment(txn) and getattr(txn, "value_date", None):
-        return txn.value_date
     return txn.txn_date
 
 
@@ -168,7 +151,7 @@ def month_filter(query, month: tuple[int, int] | None):
 
 
 def date_range_filter(query, date_from: date | None, date_to: date | None):
-    """Filter by purchase date, except installment rows use billing date."""
+    """Filter by purchase date."""
     if not date_from and not date_to:
         return query
     start, end = resolve_date_range(date_from, date_to)
@@ -405,7 +388,7 @@ def build_summary(
                 and t.category_id is None
                 and not is_ignored(t)
             ],
-            key=lambda t: (t.value_date or t.txn_date, t.txn_date, t.id),
+            key=lambda t: (display_txn_date(t), t.id),
             reverse=True,
         )
     ]

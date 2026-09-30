@@ -15,6 +15,9 @@ from expense_tracker.services.importer.common import (
     excel_serial_to_date,
 )
 
+# Marks a row from the "עסקאות שטרם נקלטו" section, which has no voucher number yet.
+PENDING_DETAILS = "pending"
+
 HEBREW_MONTHS = {
     "ינואר": 1,
     "פברואר": 2,
@@ -218,7 +221,7 @@ def rows_from_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
 
         details = get("details").replace("\n", " ").strip()
         if pending_section and not details:
-            details = "pending"
+            details = PENDING_DETAILS
 
         value_date = (
             excel_serial_to_date(get("value_date")) or statement_date or txn_date

@@ -22,6 +22,7 @@ from expense_tracker.services.importer.discount import (
 )
 from expense_tracker.services.importer.hapoalim import rows_from_dataframe
 from expense_tracker.services.importer.isracard import (
+    PENDING_DETAILS,
     rows_from_credit_card,
     _is_credit_card_raw,
 )
@@ -55,6 +56,33 @@ def parse_file(file_bytes: bytes, filename: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _pending_twin(session: Session, row: dict[str, Any]) -> Transaction | None:
+    """Row already imported from the 'עסקאות שטרם נקלטו' section of an earlier export.
+
+    Pending lines carry no voucher number, so the final statement — which does —
+    never matches the dedup key and would land as a second copy.
+    """
+    if row["details"] == PENDING_DETAILS or not row["reference"]:
+        return None
+    candidates = session.scalars(
+        select(Transaction).where(
+            Transaction.txn_date == row["txn_date"],
+            Transaction.amount == row["amount"],
+            Transaction.direction == row["direction"],
+            Transaction.details == PENDING_DETAILS,
+            Transaction.reference == "",
+        )
+    ).all()
+    desc = (row["description"] or "").casefold()
+    for txn in candidates:
+        if (txn.description or "").casefold() != desc:
+            continue
+        if txn.account and row["account"] and txn.account != row["account"]:
+            continue
+        return txn
+    return None
+
+
 def import_file(
     session: Session, file_bytes: bytes, filename: str
 ) -> dict[str, int]:
@@ -64,8 +92,15 @@ def import_file(
 
     added = 0
     skipped = 0
+    merged = 0
 
     for row in parsed:
+        # Not-yet-captured lines (עסקאות שטרם נקלטו) are provisional; wait for the
+        # final statement row, which carries a voucher number and the real details.
+        if row["details"] == PENDING_DETAILS:
+            skipped += 1
+            continue
+
         exists = session.scalars(
             select(Transaction).where(
                 Transaction.txn_date == row["txn_date"],
@@ -75,9 +110,27 @@ def import_file(
                 Transaction.direction == row["direction"],
             )
         ).first()
+        pending = _pending_twin(session, row)
         if exists:
             if row.get("value_date") and exists.value_date != row["value_date"]:
                 exists.value_date = row["value_date"]
+            if exists.details == PENDING_DETAILS and row["details"] != PENDING_DETAILS:
+                exists.details = row["details"]
+            if pending is not None and pending.id != exists.id:
+                session.delete(pending)
+                merged += 1
+            skipped += 1
+            continue
+
+        if pending is not None:
+            # Keep the existing row so its category, tags, and splits survive.
+            pending.description = row["description"]
+            pending.details = row["details"]
+            pending.reference = row["reference"]
+            if row.get("value_date"):
+                pending.value_date = row["value_date"]
+            pending.source_filename = Path(filename).name
+            merged += 1
             skipped += 1
             continue
 
@@ -106,4 +159,9 @@ def import_file(
             skipped += 1
 
     session.commit()
-    return {"added": added, "skipped": skipped, "total_parsed": len(parsed)}
+    return {
+        "added": added,
+        "skipped": skipped,
+        "merged": merged,
+        "total_parsed": len(parsed),
+    }
