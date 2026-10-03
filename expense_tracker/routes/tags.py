@@ -135,6 +135,7 @@ def delete_tag(tag_id: int):
         if not tag:
             return jsonify({"ok": False, "error": "Not found"}), 404
         tag.transactions = []
+        tag.rules = []
         tag.formulas = []
         session.delete(tag)
         session.commit()

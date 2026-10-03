@@ -35,6 +35,13 @@ transaction_tags = Table(
     Column("tag_id", ForeignKey("tags.id"), primary_key=True),
 )
 
+rule_tags = Table(
+    "rule_tags",
+    Base.metadata,
+    Column("rule_id", ForeignKey("categorization_rules.id"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id"), primary_key=True),
+)
+
 tag_formula_tags = Table(
     "tag_formula_tags",
     Base.metadata,
@@ -69,6 +76,9 @@ class Tag(Base):
 
     transactions: Mapped[list["Transaction"]] = relationship(
         secondary=transaction_tags, back_populates="tags"
+    )
+    rules: Mapped[list["CategorizationRule"]] = relationship(
+        secondary=rule_tags, back_populates="tags"
     )
     formulas: Mapped[list["TagSumFormula"]] = relationship(
         secondary=tag_formula_tags, back_populates="tags"
@@ -173,6 +183,7 @@ class CategorizationRule(Base):
     priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
 
     category: Mapped[Category] = relationship(back_populates="rules")
+    tags: Mapped[list[Tag]] = relationship(secondary=rule_tags, back_populates="rules")
 
     @property
     def display_name(self) -> str:

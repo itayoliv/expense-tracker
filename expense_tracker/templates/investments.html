@@ -79,6 +79,8 @@
     <div class="investments-stack" id="investments-live-root"
          data-quotes-url="{{ url_for('investments.quotes') }}"
          data-history-url="{{ url_for('investments.history') }}"
+         data-indicators-url="{{ url_for('investments.indicators') }}"
+         data-backtest-url="{{ url_for('investments.indicator_backtest') }}"
          data-sectors-url="{{ url_for('investments.sectors') }}"
          data-usd-ils="{{ usd_ils or 0 }}"
          data-currency-usd="$"
@@ -357,6 +359,81 @@
               </table>
             </div>
             <p class="muted-note" id="fx-conversion-no-history" {% if fx_conversions %}hidden{% endif %}>{{ t('fx_conversion_no_history') }}</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chart-panel indicator-backtest-panel collapsible-chart-panel" id="indicator-backtest">
+        <h2 class="panel-title">
+          <button type="button" class="panel-collapse-toggle" aria-expanded="false" aria-controls="indicator-backtest-body">
+            <span class="chevron">▸</span>
+            <span>{{ t('indicator_title') }}</span>
+          </button>
+        </h2>
+        <div class="collapsible-panel-body hidden" id="indicator-backtest-body">
+          <p class="muted-note">{{ t('indicator_hint') }}</p>
+          <form class="indicator-backtest-form" id="indicator-backtest-form">
+            <label class="buy-planner-field">
+              <span>{{ t('indicator_symbol') }}</span>
+              <select id="indicator-symbol" required>
+                <option value="">{{ t('buy_planner_select_stock') }}</option>
+              </select>
+            </label>
+            <label class="buy-planner-field">
+              <span>{{ t('indicator_custom_symbol') }}</span>
+              <input type="text" id="indicator-custom-symbol" maxlength="16" autocomplete="off" placeholder="AAPL">
+            </label>
+            <label class="buy-planner-field">
+              <span>{{ t('indicator_start') }}</span>
+              <input type="date" id="indicator-start" required>
+            </label>
+            <label class="buy-planner-field">
+              <span>{{ t('indicator_capital') }}</span>
+              <input type="number" id="indicator-capital" min="1" step="0.01" value="10000" required>
+            </label>
+            <button type="submit" class="btn primary" id="indicator-run">{{ t('indicator_run') }}</button>
+          </form>
+          <p class="form-error" id="indicator-error" hidden></p>
+          <p class="muted-note chart-loading" id="indicator-loading" hidden>{{ t('chart_loading') }}</p>
+
+          <div class="indicator-picker" id="indicator-picker" hidden>
+            <h3>{{ t('indicator_pick_title') }}</h3>
+            <input type="search" id="indicator-search" placeholder="{{ t('indicator_search') }}" autocomplete="off">
+            <div class="indicator-list" id="indicator-list"></div>
+          </div>
+
+          <div class="indicator-results" id="indicator-results" hidden>
+            <div class="bottom-stats indicator-stats">
+              <div class="stat highlight">
+                <span class="stat-label">{{ t('indicator_pnl') }}</span>
+                <span class="stat-value" id="indicator-pnl"></span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">{{ t('indicator_ending') }}</span>
+                <span class="stat-value" id="indicator-ending"></span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">{{ t('indicator_trades') }}</span>
+                <span class="stat-value" id="indicator-trade-count"></span>
+              </div>
+            </div>
+            <p class="muted-note" id="indicator-open-note" hidden>{{ t('indicator_open_position') }}</p>
+            <div id="tv-chart" class="tv-chart"></div>
+            <div class="fx-savings-table-wrap">
+              <table class="txn-table indicator-trades-table">
+                <thead>
+                  <tr>
+                    <th>{{ t('indicator_trade_date') }}</th>
+                    <th>{{ t('indicator_side') }}</th>
+                    <th class="col-amt">{{ t('price') }}</th>
+                    <th class="col-amt">{{ t('shares') }}</th>
+                    <th class="col-amt">{{ t('indicator_value') }}</th>
+                  </tr>
+                </thead>
+                <tbody id="indicator-trades-body"></tbody>
+              </table>
+            </div>
+            <p class="muted-note">{{ t('indicator_disclaimer') }}</p>
           </div>
         </div>
       </section>

@@ -6,6 +6,45 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.5.0 - 2026-10-03
+
+First published release after **0.4.2-4**. It includes the unpublished builds **0.4.2-5**, **0.4.2-6**, and **0.4.2-7** (indicator backtest, installment carryover totals and the last-installment mark, and tags remembered with categorization rules) plus the items below.
+
+### Dashboard
+
+- A search box under the date range, with an **Apply search** button. It matches the description, details, custom description, and tag names. Suggestions appear while typing, each labeled with the field that matched. Results stay grouped by category, and the totals and pie follow the matches.
+
+### Import
+
+- The import dialog is wider. Each file row shows how many records the file had and how many were new or already present. A file that fails to parse shows its error in that same row.
+
+## 0.4.2-7 - 2026-10-03
+
+Build **7** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-7**.
+
+### Rules
+
+- Remembering a categorization also stores the transaction's tags on the rule. Later imports that match the rule get those tags as well as the category. Matching transactions that already exist get the tags added, and tags they already have are kept.
+- The rules manager shows each rule's tags and lets you edit them.
+
+## 0.4.2-6 - 2026-10-03
+
+Build **6** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-6**.
+
+### Dashboard
+
+- Each category total now also shows how much of that sum comes from installment payments that are not the first payment (purchases from earlier months being paid this month). The same figure appears on the table total. Ignored transactions are left out.
+- A transaction that is the last slice of a plan (`תשלום N מתוך N`) shows a small check next to its amount.
+
+## 0.4.2-5 - 2026-10-01
+
+Build **5** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-5**.
+
+### Investments
+
+- Add an **indicator backtest** on the Investments page: pick a symbol, choose a popular TradingView indicator (with a short explanation), set a start date and starting capital, then see simulated buys, sells, and P&L.
+- The official TradingView chart widget opens with that indicator applied. Community Pine scripts cannot run in the embed, so the list is the built-in studies that can both display on the widget and be backtested from Yahoo daily prices (all-in / all-out at the close, no fees).
+
 ## 0.4.2-4 - 2026-09-30
 
 Build **4** under **0.4.2**. Core version unchanged. Shown in the app as **0.4.2-4**.

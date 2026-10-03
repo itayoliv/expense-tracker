@@ -5,6 +5,7 @@ from __future__ import annotations
 
 def test_dashboard_includes_import_dropzone(client):
     html = client.get("/").get_data(as_text=True)
+    assert 'class="modal modal-import"' in html
     assert 'id="import-dropzone"' in html
     assert 'id="import-file"' in html
     assert 'id="import-file-list"' in html
@@ -15,6 +16,7 @@ def test_dashboard_includes_import_dropzone(client):
     assert "bindImportDropzone" in js
     assert "assignFiles" in js
     assert "renderFileTable" in js
+    assert "applyFileResults" in js
     assert "X-Requested-With" in js
     css = client.get("/static/css/app.css").get_data(as_text=True)
     assert ".dropzone" in css
@@ -345,6 +347,26 @@ def test_import_ajax_returns_json_without_flash(client):
     assert body["added"] == 3
     assert body["skipped"] == 0
     assert "Imported" in body["message"] or "יובאו" in body["message"]
+    assert body["files"][0]["name"] == "0423_09_2026.xlsx"
+    assert body["files"][0]["added"] == 3
+    assert body["files"][0]["skipped"] == 0
+    assert body["files"][0]["total"] == 3
+    assert body["files"][0]["error"] is None
+
+    again = client.post(
+        "/import",
+        data={
+            "view": "expenses",
+            "file": [(BytesIO(payload), "0423_09_2026.xlsx")],
+        },
+        content_type="multipart/form-data",
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert again.status_code == 200
+    second = again.get_json()["files"][0]
+    assert second["added"] == 0
+    assert second["skipped"] == second["total"]
+    assert second["total"] == 3
     # AJAX path should not leave flashes for a side toast.
     with client.session_transaction() as sess:
         assert "_flashes" not in sess

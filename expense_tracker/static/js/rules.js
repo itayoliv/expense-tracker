@@ -79,7 +79,8 @@
     const q = ruleFilter.trim().toLowerCase();
     if (!q) return managedRules;
     return managedRules.filter((r) => {
-      const hay = [r.display_name, r.name, r.pattern, r.category_name]
+      const tagNames = (r.tags || []).map((tag) => tag.name);
+      const hay = [r.display_name, r.name, r.pattern, r.category_name, ...tagNames]
         .map((v) => String(v || "").toLowerCase())
         .join(" ");
       return hay.includes(q);
@@ -123,17 +124,28 @@
     return list;
   }
 
+  function ruleTagChips(rule) {
+    return (rule.tags || [])
+      .map(
+        (tag) =>
+          `<span class="tag-chip" style="--tag-color: ${escapeHtml(tag.color || "#6B7280")}">${escapeHtml(tag.name || "")}</span>`
+      )
+      .join("");
+  }
+
   function ruleRowHtml(rule) {
     const title = rule.display_name || rule.pattern || "";
     const extra =
       rule.pattern && title !== rule.pattern
         ? `<span class="cat-manage-kind">${escapeHtml(rule.pattern)}</span>`
         : "";
+    const chips = ruleTagChips(rule);
     return `
       <div class="cat-manage-row rule-row" data-id="${rule.id}">
         <div class="cat-manage-meta">
           <span class="cat-manage-name">${escapeHtml(title)}</span>
           ${extra}
+          ${chips ? `<span class="tx-tags">${chips}</span>` : ""}
         </div>
         <div class="cat-manage-actions">
           <button type="button" class="btn ghost btn-rule-edit" data-id="${rule.id}">${
@@ -188,6 +200,12 @@
     bindRuleRowActions();
   }
 
+  function setRuleTags(tagIds) {
+    const picker = document.getElementById("rule-tag-picker");
+    const setTags = APP.transactions && APP.transactions.setTagPickerSelection;
+    if (picker && setTags) setTags(picker, tagIds || []);
+  }
+
   function openRuleEditor(rule) {
     const title = document.getElementById("rule-modal-title");
     populateRuleCategories();
@@ -201,6 +219,7 @@
       document.getElementById("rule-category").value = String(rule.category_id || "");
       document.getElementById("rule-priority").value =
         rule.priority != null ? rule.priority : 100;
+      setRuleTags(rule.tag_ids);
     } else {
       if (title) {
         title.textContent = (APP.strings && APP.strings.add_rule) || "Add rule";
@@ -208,6 +227,7 @@
       if (ruleForm) ruleForm.reset();
       document.getElementById("rule-id").value = "";
       document.getElementById("rule-priority").value = 100;
+      setRuleTags([]);
     }
     showRuleForm();
   }
@@ -276,11 +296,17 @@
     ruleForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const id = document.getElementById("rule-id").value;
+      const picker = document.getElementById("rule-tag-picker");
+      const selectedTagIds =
+        APP.transactions && APP.transactions.selectedTagIds
+          ? APP.transactions.selectedTagIds
+          : () => [];
       const body = {
         name: document.getElementById("rule-name").value.trim(),
         pattern: document.getElementById("rule-pattern").value.trim(),
         category_id: document.getElementById("rule-category").value,
         priority: document.getElementById("rule-priority").value,
+        tag_ids: selectedTagIds(picker),
       };
       let res;
       if (id) {

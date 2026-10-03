@@ -5,7 +5,10 @@ Usage:
   python -m expense_tracker.integrations.yahoo fetch
 """
 
-from expense_tracker.integrations.yahoo.history import build_holdings_history
+from expense_tracker.integrations.yahoo.history import (
+    build_holdings_history,
+    fetch_daily_ohlc,
+)
 from expense_tracker.integrations.yahoo.portfolios import fetch_portfolios
 from expense_tracker.integrations.yahoo.quotes import (
     fetch_live_quotes,
@@ -31,4 +34,5 @@ __all__ = [
     "fetch_usd_ils_rate",
     "fetch_usd_ils_rate_on_date",
     "build_holdings_history",
+    "fetch_daily_ohlc",
 ]

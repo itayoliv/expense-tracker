@@ -108,6 +108,10 @@
           {% endfor %}
         </select>
       </label>
+      <div class="tag-picker" id="rule-tag-picker" data-selected="">
+        <span class="tag-picker-label">{{ t('tags') }}</span>
+        <div class="tag-picker-chips"></div>
+      </div>
       <label>
         {{ t('priority') }}
         <input type="number" id="rule-priority" value="100" step="1">

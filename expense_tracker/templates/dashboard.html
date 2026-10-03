@@ -59,6 +59,14 @@
             <input type="month" name="date_to" id="date_to" value="{{ date_to_month }}"{% if date_from_month %} min="{{ date_from_month }}"{% endif %}>
             <button type="submit" class="btn ghost" id="btn-apply-range">{{ t('apply_range') }}</button>
           </div>
+          <div class="period-search">
+            <label for="txn-search">{{ t('search_transactions') }}</label>
+            <div class="txn-search-wrap">
+              <input type="search" name="q" id="txn-search" value="{{ q }}" autocomplete="off">
+              <div class="txn-search-suggestions hidden" id="txn-search-suggestions" role="listbox"></div>
+            </div>
+            <button type="submit" class="btn ghost" id="btn-apply-search">{{ t('apply_search') }}</button>
+          </div>
         </form>
       </div>
       <div class="topbar-actions">
@@ -261,7 +269,12 @@
                 {% endfor %}
                 <span class="count-frac">{{ cat.txns|length }} / {{ pays.n }}</span>
               </td>
-              <td class="col-total">{{ money(cat.total) }}</td>
+              <td class="col-total">
+                <div>{{ money(cat.total) }}</div>
+                {% if cat.carryover_total %}
+                <div class="total-carryover" title="{{ t('carryover_hint') }}">{{ t('carryover_label') }} {{ money(cat.carryover_total) }}</div>
+                {% endif %}
+              </td>
               {% if view != 'income' %}
               <td class="col-pct">{{ '%.2f'|format(cat.pct) }}%</td>
               {% endif %}
@@ -333,7 +346,19 @@
                           {% endif %}
                         </div>
                       </td>
-                      <td class="tx-amt">{{ money(tx.amount) }}</td>
+                      <td class="tx-amt">
+                        <span class="amt-with-mark">
+                          {{ money(tx.amount) }}
+                          {% if tx.is_last_installment %}
+                          <span class="last-installment-icon" title="{{ t('last_installment') }}" aria-label="{{ t('last_installment') }}">
+                            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                              <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                              <path d="M4.75 8.15 7 10.25 11.25 5.75" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                          </span>
+                          {% endif %}
+                        </span>
+                      </td>
                       <td class="col-edit">
                         <button type="button" class="icon-btn btn-edit" title="{{ t('edit') }}" data-txn='{{ {
                           "id": tx.id,
@@ -370,7 +395,10 @@
                 {% if view == 'bottom' %}
                   {{ money(summary.net) }}
                 {% else %}
-                  {{ money(summary.grand_total) }}
+                  <div>{{ money(summary.grand_total) }}</div>
+                  {% if summary.carryover_total %}
+                  <div class="total-carryover" title="{{ t('carryover_hint') }}">{{ t('carryover_label') }} {{ money(summary.carryover_total) }}</div>
+                  {% endif %}
                 {% endif %}
               </td>
               {% if view != 'income' %}
@@ -387,14 +415,14 @@
 </div>
 
 <!-- Import modal -->
-<dialog id="import-modal" class="modal">
+<dialog id="import-modal" class="modal modal-import">
   <form method="post" action="{{ url_for('pages.import_statement') }}" enctype="multipart/form-data" class="modal-form" id="import-form">
     <h3>{{ t('upload_statement') }}</h3>
     {% with prefix='import' %}
       {% include "_import_dropzone.html" %}
     {% endwith %}
     <div class="modal-actions">
-      <button type="button" class="btn ghost" data-close>{{ t('cancel') }}</button>
+      <button type="button" class="btn ghost" data-close>{{ t('close') }}</button>
       <button type="submit" class="btn primary" id="import-submit">{{ t('import_file') }}</button>
     </div>
   </form>

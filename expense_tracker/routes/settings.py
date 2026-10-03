@@ -18,7 +18,7 @@ from expense_tracker.integrations.gpt_sort import (
     sort_unsorted_expenses,
 )
 from expense_tracker.i18n import t
-from expense_tracker.models import CategorizationRule, Transaction
+from expense_tracker.models import CategorizationRule, Transaction, rule_tags
 from expense_tracker.routes.helpers import lang
 
 bp = Blueprint("settings", __name__)
@@ -73,6 +73,7 @@ def reset_rules():
         count = (
             session.scalar(select(func.count()).select_from(CategorizationRule)) or 0
         )
+        session.execute(delete(rule_tags))
         session.execute(delete(CategorizationRule))
         session.commit()
     message = (

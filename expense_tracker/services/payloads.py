@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from expense_tracker.services.categorizer import category_map
 from expense_tracker.i18n import category_name
@@ -125,6 +126,7 @@ def rule_payload(
     lang: str, rule: CategorizationRule, cats: dict[int, Category]
 ) -> dict[str, Any]:
     cat = cats.get(rule.category_id)
+    tags = list(getattr(rule, "tags", None) or [])
     return {
         "id": rule.id,
         "name": rule.name or "",
@@ -135,13 +137,19 @@ def rule_payload(
         "category_name": category_name(lang, cat) if cat else "",
         "category_color": cat.color if cat else "#9CA3AF",
         "category_missing": cat is None,
+        "tag_ids": [tag.id for tag in tags],
+        "tags": [
+            {"id": tag.id, "name": tag.name, "color": tag.color} for tag in tags
+        ],
     }
 
 
 def list_rule_payloads(lang: str, session) -> list[dict[str, Any]]:
     cats = category_map(session)
     rules = session.scalars(
-        select(CategorizationRule).order_by(
+        select(CategorizationRule)
+        .options(selectinload(CategorizationRule.tags))
+        .order_by(
             CategorizationRule.priority.desc(),
             CategorizationRule.id,
         )

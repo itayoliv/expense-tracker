@@ -24,9 +24,12 @@ from expense_tracker.routes.helpers import (
     sort_categories,
 )
 from expense_tracker.services.payloads import category_payload, list_rule_payloads, list_tag_payloads
+from expense_tracker.services.indicator_backtest import catalog_for_lang, get_indicator, run_backtest
+from expense_tracker.services.summary import parse_iso_date
 from expense_tracker.integrations.yahoo import (
     YahooFinanceError,
     build_holdings_history,
+    fetch_daily_ohlc,
     fetch_live_quotes,
     fetch_portfolios,
     fetch_usd_ils_rate,
@@ -244,6 +247,64 @@ def history():
     except Exception as exc:
         return jsonify({"ok": False, "error": str(exc), "labels": [], "values": []}), 502
     return jsonify(payload)
+
+
+@bp.route("/investments/indicators")
+def indicators():
+    """Popular TradingView-style indicators with short explanations."""
+    return jsonify({"ok": True, "indicators": catalog_for_lang(lang())})
+
+
+@bp.route("/investments/indicator-backtest", methods=["POST"])
+def indicator_backtest():
+    """Apply an indicator on a symbol from a start date and report simulated P&L."""
+    current_lang = lang()
+    payload = request.get_json(silent=True) or {}
+    symbol = str(payload.get("symbol") or "").strip().upper()
+    indicator_id = str(payload.get("indicator_id") or "").strip()
+    start = parse_iso_date(payload.get("start_date"))
+    try:
+        capital = float(payload.get("capital") or 10000)
+    except (TypeError, ValueError):
+        capital = 0
+
+    if not symbol:
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_symbol_required")}), 400
+    if get_indicator(indicator_id) is None:
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_unknown")}), 400
+    if start is None:
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_date_required")}), 400
+    if start > date.today():
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_date_future")}), 400
+    if capital <= 0:
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_capital_required")}), 400
+
+    try:
+        history = fetch_daily_ohlc(symbol, start)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify(
+            {"ok": False, "error": t(current_lang, "indicator_history_error", error=str(exc))}
+        ), 502
+
+    candles = history.get("candles") or []
+    if not candles:
+        return jsonify({"ok": False, "error": t(current_lang, "indicator_no_history")}), 404
+
+    try:
+        result = run_backtest(candles, indicator_id, start, capital)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    return jsonify(
+        {
+            "ok": True,
+            "symbol": history.get("symbol") or symbol,
+            "tv_symbol": history.get("tv_symbol") or symbol,
+            **result,
+        }
+    )
 
 
 @bp.route("/investments/refresh", methods=["POST"])

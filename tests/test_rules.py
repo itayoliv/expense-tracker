@@ -420,3 +420,127 @@ def test_init_db_adds_transaction_source_column(tmp_path):
             )
         }
     assert kinds == {"manual", "card", "bank"}
+
+
+def _create_tag(client, name: str) -> int:
+    res = client.post("/api/tags", json={"name": name, "color": "#336699"})
+    assert res.status_code == 200
+    return res.get_json()["tag"]["id"]
+
+
+def test_remember_stores_and_replaces_rule_tags(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    work = _create_tag(client, "Work")
+    personal = _create_tag(client, "Personal")
+    txn_id = _add_txn(client, "פז", 50, "debit", "2026-07-01")
+
+    first = client.patch(
+        f"/transactions/{txn_id}",
+        json={"category_id": fuel_id, "tag_ids": [work], "remember_rule": True},
+    )
+    assert first.status_code == 200
+
+    with db.get_session() as session:
+        rule = session.scalars(select(CategorizationRule)).one()
+        assert [tag.id for tag in rule.tags] == [work]
+
+    second = client.patch(
+        f"/transactions/{txn_id}",
+        json={"category_id": fuel_id, "tag_ids": [personal], "remember_rule": True},
+    )
+    assert second.status_code == 200
+
+    with db.get_session() as session:
+        rule = session.scalars(select(CategorizationRule)).one()
+        assert [tag.id for tag in rule.tags] == [personal]
+
+
+def test_import_applies_rule_category_and_tags(client):
+    from expense_tracker.services.importer import import_file
+    from tests.test_importer import _isracard_bytes
+
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    work = _create_tag(client, "Work trip")
+    created = client.post(
+        "/api/rules",
+        json={
+            "pattern": "דינמיקה",
+            "category_id": fuel_id,
+            "tag_ids": [work],
+        },
+    )
+    assert created.status_code == 200
+
+    with db.get_session() as session:
+        import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
+        rows = list(session.scalars(select(Transaction)).all())
+        matched = [txn for txn in rows if "דינמיקה" in (txn.description or "")]
+        others = [txn for txn in rows if "דינמיקה" not in (txn.description or "")]
+        assert len(matched) == 1
+        assert matched[0].category_id == fuel_id
+        assert [tag.id for tag in matched[0].tags] == [work]
+        assert all(not txn.tags for txn in others)
+
+
+def test_apply_to_categorized_adds_tags_without_removing(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    keep = _create_tag(client, "Keep")
+    extra = _create_tag(client, "Extra")
+    first = _add_txn(client, "פז", 50, "debit", "2026-07-01")
+    second = _add_txn(client, "פז", 60, "debit", "2026-08-01")
+    client.patch(f"/transactions/{second}", json={"tag_ids": [keep]})
+
+    res = client.patch(
+        f"/transactions/{first}",
+        json={
+            "category_id": fuel_id,
+            "tag_ids": [extra],
+            "remember_rule": True,
+            "apply_to_categorized": True,
+        },
+    )
+    assert res.status_code == 200
+    assert res.get_json()["applied"] == 1
+
+    with db.get_session() as session:
+        other = session.get(Transaction, second)
+        assert other is not None
+        assert {tag.id for tag in other.tags} == {keep, extra}
+
+
+def test_rules_api_round_trips_tag_ids(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    work = _create_tag(client, "Work")
+    personal = _create_tag(client, "Personal")
+
+    created = client.post(
+        "/api/rules",
+        json={"pattern": "פז", "category_id": fuel_id, "tag_ids": [work]},
+    )
+    assert created.status_code == 200
+    rule = created.get_json()["rule"]
+    assert rule["tag_ids"] == [work]
+    assert rule["tags"][0]["name"] == "Work"
+
+    listed = client.get("/api/rules").get_json()["rules"]
+    assert listed[0]["tag_ids"] == [work]
+
+    updated = client.patch(
+        f"/api/rules/{rule['id']}",
+        json={"tag_ids": [personal]},
+    )
+    assert updated.status_code == 200
+    assert updated.get_json()["rule"]["tag_ids"] == [personal]
+    listed = client.get("/api/rules").get_json()["rules"]
+    assert listed[0]["tag_ids"] == [personal]
+
+    missing = client.post(
+        "/api/rules",
+        json={"pattern": "other", "category_id": fuel_id, "tag_ids": [999999]},
+    )
+    assert missing.status_code == 400
+
+    deleted = client.delete(f"/api/tags/{personal}")
+    assert deleted.status_code == 200
+    listed = client.get("/api/rules").get_json()["rules"]
+    assert listed[0]["tag_ids"] == []

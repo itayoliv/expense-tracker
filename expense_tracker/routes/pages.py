@@ -33,9 +33,11 @@ from expense_tracker.services.summary import (
     current_month_key,
     first_day_of_month,
     last_day_of_month,
+    load_visible_transactions,
     parse_date_from_arg,
     parse_date_to_arg,
     parse_month,
+    search_suggestions,
 )
 
 bp = Blueprint("pages", __name__)
@@ -92,6 +94,7 @@ def dashboard():
     date_from, date_to, explicit_range = _dashboard_dates()
     if date_from and date_to and date_from > date_to:
         date_to = last_day_of_month(date_from)
+    search_query = (request.args.get("q") or "").strip()
     using_range = explicit_range and (date_from is not None or date_to is not None)
     date_from_raw = date_from.isoformat() if date_from else ""
     date_from_month = date_from.strftime("%Y-%m") if date_from else ""
@@ -114,6 +117,7 @@ def dashboard():
             date_to=date_to,
             cat_sort=sort_mode,
             cat_sort_direction=sort_direction,
+            query=search_query,
         )
         categories = sort_categories(
             session.scalars(select(Category)).all(),
@@ -133,6 +137,8 @@ def dashboard():
     if using_range and not date_from_raw and not date_to_raw:
         filter_period["date_from"] = ""
         filter_period["date_to"] = ""
+    if search_query:
+        filter_period["q"] = search_query
 
     nav_period = {k: v for k, v in filter_period.items() if k != "view"}
 
@@ -147,6 +153,7 @@ def dashboard():
         date_from_month=date_from_month,
         date_to=date_to_raw,
         date_to_month=date_to_month,
+        q=search_query,
         using_range=using_range,
         filter_period=nav_period,
         summary=summary,
@@ -160,6 +167,21 @@ def dashboard():
         openai_key_set=has_api_key(),
         t=lambda k, **kw: t(current_lang, k, **kw),
     )
+
+
+@bp.route("/api/txn-search")
+def txn_search():
+    query = (request.args.get("q") or "").strip()
+    date_from = parse_date_from_arg(request.args.get("date_from"))
+    date_to = parse_date_to_arg(request.args.get("date_to"))
+    if date_from and not date_to:
+        date_to = last_day_of_month(date_from)
+    if date_from and date_to and date_from > date_to:
+        date_to = last_day_of_month(date_from)
+    with get_session() as session:
+        txns = load_visible_transactions(session, view(), date_from, date_to)
+        options = search_suggestions(txns, query)
+    return jsonify({"ok": True, "options": options})
 
 
 @bp.route("/set-lang/<lang>")
@@ -187,10 +209,21 @@ def import_statement():
     added = 0
     skipped = 0
     errors: list[str] = []
+    files: list[dict] = []
     for storage in uploads:
         original = storage.filename
         if not _allowed_upload(storage):
-            errors.append(f"{original}: Use CSV or XLSX")
+            message = "Use CSV or XLSX"
+            errors.append(f"{original}: {message}")
+            files.append(
+                {
+                    "name": original,
+                    "total": 0,
+                    "added": 0,
+                    "skipped": 0,
+                    "error": message,
+                }
+            )
             continue
         try:
             data = storage.read()
@@ -198,8 +231,26 @@ def import_statement():
                 result = import_file(session, data, original)
             added += result["added"]
             skipped += result["skipped"]
+            files.append(
+                {
+                    "name": original,
+                    "total": result["total_parsed"],
+                    "added": result["added"],
+                    "skipped": result["skipped"],
+                    "error": None,
+                }
+            )
         except Exception as e:
             errors.append(f"{original}: {e}")
+            files.append(
+                {
+                    "name": original,
+                    "total": 0,
+                    "added": 0,
+                    "skipped": 0,
+                    "error": str(e),
+                }
+            )
 
     success_message = ""
     if added or skipped:
@@ -224,6 +275,7 @@ def import_statement():
                     "message": success_message,
                     "error": error_message,
                     "errors": errors,
+                    "files": files,
                 }
             ), (200 if (added or skipped) else 400)
         flash(error_message, "error")
@@ -231,7 +283,13 @@ def import_statement():
         message = t(current_lang, "import_error", error="No file selected")
         if wants_json:
             return jsonify(
-                {"ok": False, "error": message, "added": 0, "skipped": 0}
+                {
+                    "ok": False,
+                    "error": message,
+                    "added": 0,
+                    "skipped": 0,
+                    "files": files,
+                }
             ), 400
         flash(message, "error")
 
@@ -243,6 +301,7 @@ def import_statement():
                 "skipped": skipped,
                 "message": success_message,
                 "errors": errors,
+                "files": files,
             }
         )
 

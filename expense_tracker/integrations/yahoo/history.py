@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
+from urllib.parse import quote
 
 from expense_tracker.integrations.yahoo._common import _num, _valid_symbol
 from expense_tracker.integrations.yahoo.quotes import _http_json
@@ -150,3 +151,94 @@ def build_holdings_history(
         "values": values,
         "current_total": current_total,
     }
+
+
+_TV_EXCHANGE = {
+    "NMS": "NASDAQ",
+    "NGM": "NASDAQ",
+    "NCM": "NASDAQ",
+    "NAS": "NASDAQ",
+    "NYQ": "NYSE",
+    "NYE": "NYSE",
+    "NYS": "NYSE",
+    "PCX": "AMEX",
+    "ASE": "AMEX",
+    "TAE": "TASE",
+    "TLV": "TASE",
+}
+
+
+def tradingview_symbol(yahoo_symbol: str, exchange: str = "") -> str:
+    """Map a Yahoo ticker to a TradingView symbol when the exchange is known."""
+    raw = (yahoo_symbol or "").strip().upper()
+    if raw.endswith(".TA"):
+        return f"TASE:{raw[:-3]}"
+    code = _TV_EXCHANGE.get((exchange or "").strip().upper(), "")
+    if code:
+        return f"{code}:{raw}"
+    return raw
+
+
+def fetch_daily_ohlc(
+    symbol: str, start: date, end: date | None = None, *, lookback_days: int = 450
+) -> dict[str, Any]:
+    """Daily OHLC from Yahoo, including extra history so indicators can warm up."""
+    sym = (symbol or "").strip().upper()
+    if not _valid_symbol(sym):
+        raise ValueError("Invalid symbol")
+    today = date.today()
+    last = min(end or today, today)
+    first = start - timedelta(days=lookback_days)
+    period1 = int(datetime.combine(first, time.min, tzinfo=timezone.utc).timestamp())
+    period2 = int(datetime.combine(last + timedelta(days=1), time.min, tzinfo=timezone.utc).timestamp())
+    encoded = quote(sym, safe=".")
+    data = _http_json(
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded}"
+        f"?interval=1d&period1={period1}&period2={period2}&events=history"
+    )
+    try:
+        result = data["chart"]["result"][0]  # type: ignore[index]
+        timestamps = result.get("timestamp") or []
+        quote = (result.get("indicators") or {}).get("quote") or [{}]
+        q0 = quote[0] or {}
+        opens = q0.get("open") or []
+        highs = q0.get("high") or []
+        lows = q0.get("low") or []
+        closes = q0.get("close") or []
+        volumes = q0.get("volume") or []
+        adj = ((result.get("indicators") or {}).get("adjclose") or [{}])
+        adj_closes = (adj[0] or {}).get("adjclose") if adj else None
+        meta = result.get("meta") or {}
+        exchange = str(meta.get("exchangeName") or meta.get("fullExchangeName") or "")
+        candles: list[dict[str, Any]] = []
+        for i, ts in enumerate(timestamps):
+            close = None
+            if adj_closes and i < len(adj_closes) and adj_closes[i] is not None:
+                close = float(adj_closes[i])
+            elif i < len(closes) and closes[i] is not None:
+                close = float(closes[i])
+            if close is None or close <= 0:
+                continue
+            high = float(highs[i]) if i < len(highs) and highs[i] is not None else close
+            low = float(lows[i]) if i < len(lows) and lows[i] is not None else close
+            open_px = float(opens[i]) if i < len(opens) and opens[i] is not None else close
+            volume = float(volumes[i]) if i < len(volumes) and volumes[i] is not None else 0.0
+            day = datetime.fromtimestamp(int(ts), tz=timezone.utc).date()
+            candles.append(
+                {
+                    "date": day,
+                    "open": open_px,
+                    "high": max(high, close, open_px),
+                    "low": min(low, close, open_px),
+                    "close": close,
+                    "volume": volume,
+                }
+            )
+        return {
+            "symbol": str(meta.get("symbol") or sym).upper(),
+            "exchange": exchange,
+            "tv_symbol": tradingview_symbol(sym, exchange),
+            "candles": candles,
+        }
+    except (TypeError, KeyError, IndexError, ValueError, AttributeError):
+        return {"symbol": sym, "exchange": "", "tv_symbol": tradingview_symbol(sym), "candles": []}

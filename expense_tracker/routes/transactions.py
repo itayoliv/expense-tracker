@@ -149,12 +149,15 @@ def update_transaction(txn_id: int):
         if txn.category_id and txn.description and not txn.ignored:
             cat = session.get(Category, txn.category_id)
             if cat:
+                txn_tags = list(txn.tags)
                 if remember:
-                    remember_rule(session, txn.description, cat.id)
+                    remember_rule(session, txn.description, cat.id, tags=txn_tags)
                 if apply_all:
-                    applied = apply_to_similar_all(session, txn, cat.id)
+                    applied = apply_to_similar_all(session, txn, cat.id, tags=txn_tags)
                 elif remember:
-                    applied = apply_to_similar_unsorted(session, txn, cat.id)
+                    applied = apply_to_similar_unsorted(
+                        session, txn, cat.id, tags=txn_tags
+                    )
 
         session.commit()
 

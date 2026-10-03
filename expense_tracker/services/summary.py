@@ -12,8 +12,10 @@ from sqlalchemy.orm import joinedload, selectinload
 from expense_tracker.i18n import category_name, t
 from expense_tracker.models import Transaction
 from expense_tracker.services.installments import (  # noqa: F401 — re-exported
+    is_followup_installment,
     is_installment,
     is_installment_details,
+    is_last_installment,
 )
 from expense_tracker.services.split import resolve_split_parents
 
@@ -218,6 +220,7 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "ignored": is_ignored(x),
         "ignore_reason": getattr(x, "ignore_reason", "") or "",
         "is_installment": is_installment(x),
+        "is_last_installment": is_last_installment(x),
         "tags": tags,
         **split_accent(getattr(x, "split_group", "") or ""),
         **txn_source_fields(lang, x),
@@ -238,16 +241,59 @@ def is_bank_card_lump(txn) -> bool:
     return source_kind(txn) != "card"
 
 
-def build_summary(
+def txn_search_fields(txn) -> list[tuple[str, str]]:
+    """Text fields a dashboard search can match, with the field name."""
+    pairs: list[tuple[str, str]] = []
+    for field, value in (
+        ("description", getattr(txn, "description", None)),
+        ("details", getattr(txn, "details", None)),
+        ("custom_description", getattr(txn, "custom_description", None)),
+    ):
+        text = (value or "").strip()
+        if text:
+            pairs.append((field, text))
+    for tag in getattr(txn, "tags", None) or []:
+        name = (getattr(tag, "name", None) or "").strip()
+        if name:
+            pairs.append(("tag", name))
+    return pairs
+
+
+def txn_matches_query(txn, query: str | None) -> bool:
+    needle = (query or "").strip().casefold()
+    if not needle:
+        return True
+    return any(needle in value.casefold() for _, value in txn_search_fields(txn))
+
+
+def search_suggestions(txns: list, query: str, limit: int = 8) -> list[dict[str, str]]:
+    """Distinct field values that contain the query, up to ``limit`` options."""
+    needle = (query or "").strip().casefold()
+    if not needle:
+        return []
+    seen: set[tuple[str, str]] = set()
+    options: list[dict[str, str]] = []
+    for txn in txns:
+        for field, value in txn_search_fields(txn):
+            if needle not in value.casefold():
+                continue
+            key = (field, value.casefold())
+            if key in seen:
+                continue
+            seen.add(key)
+            options.append({"text": value, "field": field})
+            if len(options) >= limit:
+                return options
+    return options
+
+
+def load_visible_transactions(
     session,
     view: str,
-    lang: str,
-    *,
     date_from: date | None = None,
     date_to: date | None = None,
-    cat_sort: str = "alpha",
-    cat_sort_direction: str = "asc",
-) -> dict:
+) -> list:
+    """Transactions shown on the dashboard for this view and date range."""
     base = select(Transaction).options(
         joinedload(Transaction.category),
         selectinload(Transaction.tags),
@@ -262,17 +308,28 @@ def build_summary(
         for t in txns
         if not is_split_parent(t) and t.id not in hidden_parent_ids
     ]
-
-    # Avoid double-counting: when card merchant details exist, hide bank card lumps
     if has_card_detail_imports(txns):
         txns = [t for t in txns if not is_bank_card_lump(t)]
-
     if view == "expenses":
-        filtered = [t for t in txns if t.direction == "debit"]
-    elif view == "income":
-        filtered = [t for t in txns if t.direction == "credit"]
-    else:
-        filtered = txns
+        return [t for t in txns if t.direction == "debit"]
+    if view == "income":
+        return [t for t in txns if t.direction == "credit"]
+    return txns
+
+
+def build_summary(
+    session,
+    view: str,
+    lang: str,
+    *,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    cat_sort: str = "alpha",
+    cat_sort_direction: str = "asc",
+    query: str | None = None,
+) -> dict:
+    txns = load_visible_transactions(session, view, date_from, date_to)
+    filtered = [t for t in txns if txn_matches_query(t, query)]
 
     groups: dict[str, dict[str, Any]] = {}
 
@@ -289,11 +346,14 @@ def build_summary(
                     "color": color,
                     "icon": "wallet" if key == "income" else "tag",
                     "total": 0.0,
+                    "carryover_total": 0.0,
                     "transactions": [],
                     "category_id": None,
                 }
             if count_amount:
                 groups[key]["total"] += txn.amount
+                if is_followup_installment(txn):
+                    groups[key]["carryover_total"] += txn.amount
             groups[key]["transactions"].append(txn)
             continue
 
@@ -306,11 +366,14 @@ def build_summary(
                     "color": "#9CA3AF",
                     "icon": "question",
                     "total": 0.0,
+                    "carryover_total": 0.0,
                     "transactions": [],
                     "category_id": None,
                 }
             if count_amount:
                 groups[cat_key]["total"] += txn.amount
+                if is_followup_installment(txn):
+                    groups[cat_key]["carryover_total"] += txn.amount
             groups[cat_key]["transactions"].append(txn)
         else:
             cat = txn.category
@@ -322,15 +385,19 @@ def build_summary(
                     "color": cat.color,
                     "icon": cat.icon,
                     "total": 0.0,
+                    "carryover_total": 0.0,
                     "transactions": [],
                     "category_id": cat.id,
                     "sort_order": cat.sort_order,
                 }
             if count_amount:
                 groups[key]["total"] += txn.amount
+                if is_followup_installment(txn):
+                    groups[key]["carryover_total"] += txn.amount
             groups[key]["transactions"].append(txn)
 
     grand = sum(g["total"] for g in groups.values())
+    carryover = sum(g["carryover_total"] for g in groups.values())
 
     unsorted_group = groups.pop("__unsorted__", None)
     if cat_sort == "value":
@@ -355,10 +422,10 @@ def build_summary(
         del g["transactions"]
 
     expense_total = sum(
-        t.amount for t in txns if t.direction == "debit" and not is_ignored(t)
+        t.amount for t in filtered if t.direction == "debit" and not is_ignored(t)
     )
     income_total = sum(
-        t.amount for t in txns if t.direction == "credit" and not is_ignored(t)
+        t.amount for t in filtered if t.direction == "credit" and not is_ignored(t)
     )
 
     unsorted_expense = [
@@ -366,7 +433,7 @@ def build_summary(
         for x in sorted(
             [
                 t
-                for t in txns
+                for t in filtered
                 if t.direction == "debit"
                 and t.category_id is None
                 and not is_ignored(t)
@@ -379,6 +446,7 @@ def build_summary(
     return {
         "categories": categories,
         "grand_total": grand,
+        "carryover_total": carryover,
         "expense_total": expense_total,
         "income_total": income_total,
         "net": income_total - expense_total,

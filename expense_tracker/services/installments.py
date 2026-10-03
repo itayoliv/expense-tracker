@@ -32,6 +32,28 @@ def is_installment(txn) -> bool:
     )
 
 
+def _installment_parts(txn) -> tuple[int, int] | None:
+    if isinstance(txn, dict):
+        details = txn.get("details")
+        description = txn.get("description")
+    else:
+        details = getattr(txn, "details", None)
+        description = getattr(txn, "description", None)
+    return parse_installment(details) or parse_installment(description)
+
+
+def is_followup_installment(txn) -> bool:
+    """Numbered slice after the first payment (תשלום 2+ מתוך N)."""
+    parsed = _installment_parts(txn)
+    return bool(parsed and parsed[0] > 1)
+
+
+def is_last_installment(txn) -> bool:
+    """True when this slice is the final payment (תשלום N מתוך N)."""
+    parsed = _installment_parts(txn)
+    return bool(parsed and parsed[1] >= 1 and parsed[0] == parsed[1])
+
+
 def parse_installment(text: str | None) -> tuple[int, int] | None:
     """Return (payment number, total payments) from e.g. 'תשלום 3 מתוך 24'."""
     match = _INSTALLMENT_INDEX_RE.search(text or "")

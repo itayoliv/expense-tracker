@@ -64,6 +64,35 @@
       resultBox.textContent = "";
     }
 
+    function formatFileResult(file) {
+      if (file && file.error) return String(file.error);
+      const template =
+        (APP.strings && APP.strings.import_file_result) ||
+        "In this file: {total} records, {added} new and {skipped} existing";
+      return template
+        .replaceAll("{total}", String((file && file.total) || 0))
+        .replaceAll("{added}", String((file && file.added) || 0))
+        .replaceAll("{skipped}", String((file && file.skipped) || 0));
+    }
+
+    function applyFileResults(files) {
+      if (!fileListBody || !Array.isArray(files)) return;
+      fileListBody.querySelectorAll(".import-file-result").forEach((node) => {
+        node.remove();
+      });
+      const rows = fileListBody.querySelectorAll("tr");
+      files.forEach((file, index) => {
+        const row = rows[index];
+        if (!row) return;
+        const nameCell = row.querySelector(".col-name");
+        if (!nameCell) return;
+        const line = document.createElement("div");
+        line.className = "import-file-result" + (file.error ? " is-error" : "");
+        line.textContent = formatFileResult(file);
+        nameCell.appendChild(line);
+      });
+    }
+
     function showResult(payload) {
       if (!resultBox) return;
       const parts = [];
@@ -249,7 +278,12 @@
               "Import failed. Please try again.",
           };
         }
-        showResult(payload);
+        if (Array.isArray(payload.files) && payload.files.length) {
+          applyFileResults(payload.files);
+          clearResult();
+        } else {
+          showResult(payload);
+        }
         if (payload.ok) {
           importedOk = true;
           fileInput.value = "";

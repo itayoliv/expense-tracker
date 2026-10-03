@@ -149,10 +149,10 @@ def import_file(
             source=row.get("source") or "bank",
             is_manual=False,
         )
-        categorize_transaction(session, txn, rules=rules, cats=cats)
         try:
             with session.begin_nested():
                 session.add(txn)
+                categorize_transaction(session, txn, rules=rules, cats=cats)
                 session.flush()
             added += 1
         except IntegrityError:

@@ -13,7 +13,9 @@ from expense_tracker.services.payloads import (
     ensure_unique_rule,
     list_rule_payloads,
     parse_rule_fields,
+    parse_tag_ids,
     require_category_id,
+    resolve_tags,
     rule_payload,
 )
 
@@ -33,6 +35,7 @@ def create_rule():
     payload = request.get_json(silent=True) or {}
     try:
         fields = parse_rule_fields(payload)
+        tag_ids = parse_tag_ids(payload)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -40,6 +43,7 @@ def create_rule():
         try:
             require_category_id(session, fields["category_id"])
             ensure_unique_rule(session, fields["pattern"], fields["category_id"])
+            tags = resolve_tags(session, tag_ids) if tag_ids is not None else None
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 400
         rule = CategorizationRule(
@@ -48,6 +52,8 @@ def create_rule():
             category_id=fields["category_id"],
             priority=fields.get("priority", 100),
         )
+        if tags is not None:
+            rule.tags = tags
         session.add(rule)
         session.commit()
         cats = category_map(session)
@@ -66,6 +72,7 @@ def update_rule(rule_id: int):
     payload = request.get_json(silent=True) or {}
     try:
         fields = parse_rule_fields(payload, partial=True)
+        tag_ids = parse_tag_ids(payload)
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -79,6 +86,7 @@ def update_rule(rule_id: int):
             if "category_id" in fields:
                 require_category_id(session, category_id)
             ensure_unique_rule(session, pattern, category_id, exclude_id=rule.id)
+            tags = resolve_tags(session, tag_ids) if tag_ids is not None else None
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 400
         if "name" in fields:
@@ -89,6 +97,8 @@ def update_rule(rule_id: int):
             rule.category_id = fields["category_id"]
         if "priority" in fields:
             rule.priority = fields["priority"]
+        if tags is not None:
+            rule.tags = tags
         session.commit()
         cats = category_map(session)
         return jsonify(

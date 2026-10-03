@@ -64,6 +64,7 @@
         confirm_delete_category: {{ t('confirm_delete_category')|tojson }},
         importing: {{ t('importing')|tojson }},
         import_file: {{ t('import_file')|tojson }},
+        import_file_result: {{ t('import_file_result')|tojson }},
         import_invalid_type: {{ t('import_invalid_type')|tojson }},
         import_failed: {{ t('import_failed')|tojson }},
         files_selected: {{ t('files_selected')|tojson }},
@@ -106,11 +107,20 @@
         sort_categories_alpha: {{ t('sort_categories_alpha')|tojson }},
         sort_categories_value: {{ t('sort_categories_value')|tojson }},
         sort_ascending: {{ t('sort_ascending')|tojson }},
-        sort_descending: {{ t('sort_descending')|tojson }}
+        sort_descending: {{ t('sort_descending')|tojson }},
+        indicator_buy: {{ t('indicator_buy')|tojson }},
+        indicator_sell: {{ t('indicator_sell')|tojson }},
+        indicator_pick_one: {{ t('indicator_pick_one')|tojson }},
+        indicator_symbol_required: {{ t('indicator_symbol_required')|tojson }},
+        search_field_description: {{ t('search_field_description')|tojson }},
+        search_field_details: {{ t('search_field_details')|tojson }},
+        search_field_custom_description: {{ t('search_field_custom_description')|tojson }},
+        search_field_tag: {{ t('search_field_tag')|tojson }}
       }
     };
   </script>
   <script defer src="{{ url_for('static', filename='js/core.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/search.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/pie.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/import.js') }}"></script>
   <script defer src="{{ url_for('static', filename='js/transactions.js') }}"></script>

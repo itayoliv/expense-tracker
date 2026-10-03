@@ -4,6 +4,8 @@
 
   const quotesUrl = root.dataset.quotesUrl;
   const historyUrl = root.dataset.historyUrl;
+  const indicatorsUrl = root.dataset.indicatorsUrl;
+  const backtestUrl = root.dataset.backtestUrl;
   const sectorsUrl = root.dataset.sectorsUrl;
   const usdSym = root.dataset.currencyUsd || "$";
   const ilsSym = root.dataset.currencyIls || "₪";
@@ -206,6 +208,7 @@
 
     select.disabled = select.options.length <= 1;
     if (addBtn) addBtn.disabled = select.disabled;
+    fillIndicatorSymbolSelect();
   }
 
   function updateBuyPlanner() {
@@ -574,6 +577,226 @@
         if (submit) submit.disabled = false;
       }
     });
+  }
+
+  function i18n(key, fallback) {
+    return (window.APP && window.APP.ui && window.APP.ui.str(key, fallback)) || fallback;
+  }
+
+  function fillIndicatorSymbolSelect() {
+    const select = document.getElementById("indicator-symbol");
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = labels.buySelectStock;
+    select.appendChild(placeholder);
+    [...buyStockCatalog.values()]
+      .sort((a, b) => a.symbol.localeCompare(b.symbol))
+      .forEach((stock) => {
+        const option = document.createElement("option");
+        option.value = stock.symbol;
+        option.textContent = stock.name === stock.symbol
+          ? stock.symbol
+          : `${stock.symbol} — ${stock.name}`;
+        select.appendChild(option);
+      });
+    if (current && [...select.options].some((opt) => opt.value === current)) {
+      select.value = current;
+    }
+  }
+
+  function loadTvScript() {
+    if (window.TradingView) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://s3.tradingview.com/tv.js";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("TradingView widget failed to load"));
+      document.head.appendChild(script);
+    });
+  }
+
+  function bindIndicatorBacktest() {
+    const form = document.getElementById("indicator-backtest-form");
+    const picker = document.getElementById("indicator-picker");
+    const list = document.getElementById("indicator-list");
+    const search = document.getElementById("indicator-search");
+    const results = document.getElementById("indicator-results");
+    const errorEl = document.getElementById("indicator-error");
+    const loading = document.getElementById("indicator-loading");
+    const startInput = document.getElementById("indicator-start");
+    if (!form || !list) return;
+
+    if (startInput && !startInput.value) {
+      const start = new Date();
+      start.setFullYear(start.getFullYear() - 1);
+      startInput.value = start.toISOString().slice(0, 10);
+    }
+
+    fillIndicatorSymbolSelect();
+
+    let indicators = [];
+    let selectedId = "";
+    let tvWidget = null;
+
+    function showError(message) {
+      if (!errorEl) return;
+      errorEl.textContent = message || "";
+      errorEl.hidden = !message;
+    }
+
+    function renderIndicatorList() {
+      const query = (search?.value || "").trim().toLowerCase();
+      list.innerHTML = "";
+      indicators
+        .filter((item) => {
+          if (!query) return true;
+          return `${item.name} ${item.explanation}`.toLowerCase().includes(query);
+        })
+        .forEach((item) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `indicator-option${item.id === selectedId ? " active" : ""}`;
+          btn.dataset.id = item.id;
+          btn.innerHTML = `<strong></strong><span></span>`;
+          btn.querySelector("strong").textContent = item.name;
+          btn.querySelector("span").textContent = item.explanation;
+          btn.addEventListener("click", () => {
+            selectedId = item.id;
+            renderIndicatorList();
+          });
+          list.appendChild(btn);
+        });
+    }
+
+    async function loadIndicators() {
+      if (!indicatorsUrl) return;
+      try {
+        const resp = await fetch(indicatorsUrl, { headers: { Accept: "application/json" } });
+        const data = await resp.json();
+        indicators = data.indicators || [];
+        if (picker) picker.hidden = indicators.length === 0;
+        if (!selectedId && indicators[0]) selectedId = indicators[0].id;
+        renderIndicatorList();
+      } catch {
+        indicators = [];
+      }
+    }
+
+    async function renderTradingView(tvSymbol, studies) {
+      const container = document.getElementById("tv-chart");
+      if (!container) return;
+      await loadTvScript();
+      container.innerHTML = "";
+      const locale = window.APP && window.APP.lang === "he" ? "he_IL" : "en";
+      tvWidget = new window.TradingView.widget({
+        autosize: true,
+        symbol: tvSymbol,
+        interval: "D",
+        timezone: "Asia/Jerusalem",
+        theme: "light",
+        style: "1",
+        locale,
+        enable_publishing: false,
+        hide_top_toolbar: false,
+        hide_legend: false,
+        save_image: false,
+        allow_symbol_change: true,
+        withdateranges: true,
+        studies: studies || [],
+        container_id: "tv-chart",
+      });
+      void tvWidget;
+    }
+
+    function renderResult(payload) {
+      if (!results) return;
+      results.hidden = false;
+      const pnl = Number(payload.pnl) || 0;
+      const pnlEl = document.getElementById("indicator-pnl");
+      const endingEl = document.getElementById("indicator-ending");
+      const countEl = document.getElementById("indicator-trade-count");
+      const openNote = document.getElementById("indicator-open-note");
+      if (pnlEl) {
+        pnlEl.textContent = `${pnl >= 0 ? "+" : ""}${usdSym}${formatNum(pnl)} (${payload.pnl_pct}%)`;
+        pnlEl.classList.toggle("chg-up", pnl > 0);
+        pnlEl.classList.toggle("chg-down", pnl < 0);
+      }
+      if (endingEl) endingEl.textContent = `${usdSym}${formatNum(payload.ending_equity)}`;
+      if (countEl) countEl.textContent = `${payload.buy_count} / ${payload.sell_count}`;
+      if (openNote) openNote.hidden = !payload.open_position;
+      const body = document.getElementById("indicator-trades-body");
+      if (body) {
+        body.innerHTML = "";
+        (payload.trades || []).forEach((trade) => {
+          const row = document.createElement("tr");
+          const sideLabel = trade.side === "buy"
+            ? i18n("indicator_buy", "Buy")
+            : i18n("indicator_sell", "Sell");
+          row.innerHTML = `
+            <td></td>
+            <td class="side-${trade.side}"></td>
+            <td class="tx-amt"></td>
+            <td class="tx-amt"></td>
+            <td class="tx-amt"></td>`;
+          row.children[0].textContent = trade.date;
+          row.children[1].textContent = sideLabel;
+          row.children[2].textContent = `${usdSym}${formatNum(trade.price)}`;
+          row.children[3].textContent = String(trade.shares);
+          row.children[4].textContent = `${usdSym}${formatNum(trade.value)}`;
+          body.appendChild(row);
+        });
+      }
+      renderTradingView(payload.tv_symbol || payload.symbol, payload.tv_studies || []);
+    }
+
+    if (search) search.addEventListener("input", renderIndicatorList);
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const custom = (document.getElementById("indicator-custom-symbol")?.value || "").trim().toUpperCase();
+      const selected = document.getElementById("indicator-symbol")?.value || "";
+      const symbol = custom || selected;
+      if (!symbol) {
+        showError(i18n("indicator_symbol_required", "Choose or type a symbol."));
+        return;
+      }
+      if (!selectedId) {
+        showError(i18n("indicator_pick_one", "Choose an indicator from the list."));
+        return;
+      }
+      showError("");
+      if (loading) loading.hidden = false;
+      if (results) results.hidden = true;
+      const submit = document.getElementById("indicator-run");
+      if (submit) submit.disabled = true;
+      try {
+        const resp = await fetch(backtestUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            symbol,
+            indicator_id: selectedId,
+            start_date: startInput?.value,
+            capital: document.getElementById("indicator-capital")?.value,
+          }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+        await renderResult(data);
+      } catch (error) {
+        showError(error.message || String(error));
+      } finally {
+        if (loading) loading.hidden = true;
+        if (submit) submit.disabled = false;
+      }
+    });
+
+    loadIndicators();
   }
 
   function bindCollapsiblePanels() {
@@ -1037,6 +1260,7 @@
   bindBuyPlanner();
   bindFxSavings();
   bindFxConversionRecords();
+  bindIndicatorBacktest();
   loadHistory();
   loadSectors();
   tick();
