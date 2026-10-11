@@ -10,7 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from expense_tracker.models import Transaction
-from expense_tracker.services.categorizer import categorize_transaction, category_map, load_rules
+from expense_tracker.services.categorizer import (
+    categorize_transaction,
+    category_map,
+    inherit_tags,
+    load_rules,
+    tag_history,
+)
 from expense_tracker.services.importer.common import (
     _load_raw,
     excel_serial_to_date,
@@ -89,6 +95,7 @@ def import_file(
     parsed = parse_file(file_bytes, filename)
     rules = load_rules(session)
     cats = category_map(session)
+    history = tag_history(session)
 
     added = 0
     skipped = 0
@@ -153,6 +160,7 @@ def import_file(
             with session.begin_nested():
                 session.add(txn)
                 categorize_transaction(session, txn, rules=rules, cats=cats)
+                inherit_tags(txn, history)
                 session.flush()
             added += 1
         except IntegrityError:

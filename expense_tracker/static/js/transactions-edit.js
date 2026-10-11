@@ -100,7 +100,10 @@
         setIgnoreFields(true, Boolean(data.ignored), data.ignore_reason || "");
         let isoDate = "";
         const parts = (data.date || "").split("/");
-        if (parts.length === 3) {
+        if (data.purchase_date) {
+          isoDate = data.purchase_date;
+          document.getElementById("txn-date").value = isoDate;
+        } else if (parts.length === 3) {
           let y = parseInt(parts[2], 10);
           if (y < 100) y += 2000;
           const m = parts[1].padStart(2, "0");

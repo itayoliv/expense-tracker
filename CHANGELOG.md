@@ -6,6 +6,22 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.5.0-1 - 2026-10-11
+
+Build **1** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-1**.
+
+### Transactions
+
+- Editing an installment no longer overwrites its purchase date with the payment date shown on the dashboard. Saving a category or custom description keeps the row in the correct month, and no longer fails when an older copy of the same payment already exists.
+
+### Import
+
+- A newly imported transaction that gets a category also gets the tags from the latest existing transaction with the same description, direction, and category, when the matching rule itself has no tags. Tags stored on the rule still take priority.
+
+### Dev tools
+
+- `scripts/dev/repair-installment-dates.bat` previews and, after confirmation, repairs installment rows whose purchase date was overwritten by the old edit bug. It backs up the database first.
+
 ## 0.5.0 - 2026-10-03
 
 First published release after **0.4.2-4**. It includes the unpublished builds **0.4.2-5**, **0.4.2-6**, and **0.4.2-7** (indicator backtest, installment carryover totals and the last-installment mark, and tags remembered with categorization rules) plus the items below.

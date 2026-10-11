@@ -482,6 +482,37 @@ def test_import_applies_rule_category_and_tags(client):
         assert all(not txn.tags for txn in others)
 
 
+def test_import_inherits_tags_from_previous_same_category_row(client):
+    from expense_tracker.services.importer import import_file
+    from tests.test_importer import _isracard_bytes
+
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    other_id = _id_by_name_en(client, "Shopping")
+    work = _create_tag(client, "Work trip")
+    assert client.post(
+        "/api/rules", json={"pattern": "דינמיקה", "category_id": fuel_id}
+    ).status_code == 200
+    previous = _add_txn(client, "דינמיקה רננים", 100, "debit", "2026-05-01")
+    client.patch(
+        f"/transactions/{previous}", json={"category_id": fuel_id, "tag_ids": [work]}
+    )
+    other = _add_txn(client, "APPLE.COM/BILL", 10, "debit", "2026-05-01")
+    client.patch(f"/transactions/{other}", json={"category_id": other_id, "tag_ids": [work]})
+
+    with db.get_session() as session:
+        import_file(session, _isracard_bytes(), "0423_09_2026.xlsx")
+        imported = {
+            txn.description: txn
+            for txn in session.scalars(
+                select(Transaction).where(Transaction.is_manual.is_(False))
+            ).all()
+        }
+        assert imported["דינמיקה רננים"].category_id == fuel_id
+        assert [tag.id for tag in imported["דינמיקה רננים"].tags] == [work]
+        assert imported["APPLE.COM/BILL"].category_id != other_id
+        assert not imported["APPLE.COM/BILL"].tags
+
+
 def test_apply_to_categorized_adds_tags_without_removing(client):
     fuel_id = _id_by_name_en(client, "Fuel and transport")
     keep = _create_tag(client, "Keep")

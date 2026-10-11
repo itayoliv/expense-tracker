@@ -72,6 +72,32 @@ def categorize_transaction(
         txn.tags = list(rule.tags)
 
 
+def tag_history(session: Session) -> dict[tuple[str, str, int], list[Tag]]:
+    """Latest tags per (description, direction, category) from already-tagged rows."""
+    tagged = session.scalars(
+        select(Transaction)
+        .where(Transaction.category_id.is_not(None), Transaction.tags.any())
+        .options(selectinload(Transaction.tags))
+        .order_by(Transaction.txn_date, Transaction.id)
+    ).all()
+    return {
+        ((t.description or "").strip().lower(), t.direction, t.category_id): list(t.tags)
+        for t in tagged
+    }
+
+
+def inherit_tags(
+    txn: Transaction, history: dict[tuple[str, str, int], list[Tag]]
+) -> None:
+    """Give a categorized, untagged row the tags of its previous look-alike."""
+    if not txn.category_id or txn.tags:
+        return
+    key = ((txn.description or "").strip().lower(), txn.direction, txn.category_id)
+    tags = history.get(key)
+    if tags:
+        txn.tags = list(tags)
+
+
 def remember_rule(
     session: Session,
     pattern: str,
