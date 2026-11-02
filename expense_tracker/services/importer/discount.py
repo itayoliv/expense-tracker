@@ -106,13 +106,6 @@ def rows_from_discount_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
         if signed is None:
             continue
 
-        if signed < 0:
-            direction = "credit"
-            amount = abs(signed)
-        else:
-            direction = "debit"
-            amount = signed
-
         value_date = excel_serial_to_date(get("value_date")) or txn_date
         details = get("details").replace("\n", " ").strip()
         card = get("card")
@@ -127,8 +120,8 @@ def rows_from_discount_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
                 "reference": "",
                 "beneficiary": "",
                 "purpose": card.strip(),
-                "amount": float(amount),
-                "direction": direction,
+                "amount": float(signed),
+                "direction": "debit",
                 "account": card4 or account,
             }
         )

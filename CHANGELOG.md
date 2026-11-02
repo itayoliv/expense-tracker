@@ -6,6 +6,23 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.5.0-2 - 2026-11-02
+
+Build **2** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-2**.
+
+### Dashboard
+
+- A Graphs page shows one category's spending or income per month as a bar chart, with the total and the monthly average.
+
+### Import
+
+- Max (מקס) transaction-details workbooks can be imported. Rows on the sheet עסקאות שאושרו וטרם נקלטו are skipped until they appear on a billed sheet.
+- A negative charge on an Isracard, Max, or Discount card statement is stored as an expense with a negative amount. It stays on the expenses page, still matches category and tag rules, and reduces the category total and the expenses total. Editing or splitting that row keeps the minus. Bank credits, such as salary, stay income.
+
+### Dev tools
+
+- `scripts/dev/repair-installment-dates.bat` now defaults to `data/expenses.db`.
+
 ## 0.5.0-1 - 2026-10-11
 
 Build **1** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-1**.

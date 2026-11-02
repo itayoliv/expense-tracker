@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_money.html" import money with context %}
+{% block body %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand-block">
+      <div class="brand">Expense Tracker</div>
+      <div class="app-version">v{{ app_version }}</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">
+        <div class="nav-label">{{ t('nav_snapshot') }}</div>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='expenses') }}">{{ t('expenses') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='income') }}">{{ t('income') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='bottom') }}">{{ t('bottom_line') }}</a>
+        <a class="nav-link" href="{{ url_for('investments.investments') }}">{{ t('investments') }}</a>
+        <a class="nav-link active" href="{{ url_for('pages.graphs') }}">{{ t('graphs') }}</a>
+      </div>
+      <div class="nav-section">
+        <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-rules">{{ t('manage_rules') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-manage-tags">{{ t('manage_tags') }}</button>
+        <button type="button" class="nav-link nav-btn" id="btn-settings">{{ t('settings') }}</button>
+        <button type="button" class="nav-link nav-btn js-shutdown-app" id="btn-shutdown-app-nav">{{ t('shutdown_app') }}</button>
+      </div>
+      <div class="nav-section muted">
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('arrange') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('planning') }}</span>
+        <span class="nav-link disabled" title="{{ t('coming_soon') }}">{{ t('broad_view') }}</span>
+      </div>
+    </nav>
+    <div class="lang-switch">
+      <span class="lang-label">{{ t('language') }}</span>
+      <div class="lang-btns">
+        <a class="lang-btn {% if lang == 'en' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='en', next=request.full_path) }}">EN</a>
+        <a class="lang-btn {% if lang == 'he' %}active{% endif %}"
+           href="{{ url_for('pages.set_lang', lang='he', next=request.full_path) }}">עב</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>{{ t('graphs') }}</h1>
+        <p class="muted-note">{{ t('graphs_hint') }}</p>
+      </div>
+    </header>
+
+    <form class="graphs-picker" method="get" action="{{ url_for('pages.graphs') }}">
+      <label>
+        {{ t('category') }}
+        <select name="category_id" onchange="this.form.submit()">
+          <option value="">{{ t('choose_category') }}</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if selected_category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+
+    {% if series %}
+      <div class="chart-panel graphs-panel">
+        <h2 class="panel-title">{{ series.name }}</h2>
+        {% if series.months %}
+          <div class="graphs-stats">
+            <span>{{ t('graphs_total') }}: {{ money(series.total) }}</span>
+            <span>{{ t('graphs_average') }}: {{ money(series.average) }}</span>
+          </div>
+          <div class="graphs-canvas-wrap">
+            <canvas id="category-month-chart"></canvas>
+          </div>
+          <table class="graphs-table">
+            <thead>
+              <tr>
+                <th>{{ t('month') }}</th>
+                <th>{{ t('amount') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for point in series.months %}
+              <tr>
+                <td>{{ point.label }}</td>
+                <td>{{ money(point.total) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th>{{ t('graphs_average') }}</th>
+                <td>{{ money(series.average) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <script id="graphs-series" type="application/json" data-average-label="{{ t('graphs_average') }}">{{ series|tojson }}</script>
+        {% else %}
+          <p class="muted-note">{{ t('graphs_empty') }}</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </main>
+</div>
+{% include "_manage_modals.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/graphs.js') }}"></script>
+{% endblock %}

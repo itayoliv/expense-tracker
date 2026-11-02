@@ -12,6 +12,7 @@ from expense_tracker.services.importer.common import (
     _cell_str,
     _normalize_header,
     _parse_amount,
+    _parse_signed_amount,
     excel_serial_to_date,
 )
 
@@ -213,10 +214,10 @@ def rows_from_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
                 col_map = None
             continue
 
-        charge = _parse_amount(get("charge_amount"))
-        txn_amt = _parse_amount(get("txn_amount"))
-        amount = charge if charge is not None else txn_amt
-        if amount is None:
+        signed = _parse_signed_amount(get("charge_amount"))
+        if signed is None:
+            signed = _parse_signed_amount(get("txn_amount"))
+        if signed is None:
             continue
 
         details = get("details").replace("\n", " ").strip()
@@ -237,7 +238,7 @@ def rows_from_credit_card(raw: pd.DataFrame) -> list[dict[str, Any]]:
                 "reference": ref,
                 "beneficiary": "",
                 "purpose": "",
-                "amount": float(amount),
+                "amount": float(signed),
                 "direction": "debit",
                 "account": account,
             }

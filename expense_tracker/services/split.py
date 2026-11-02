@@ -206,6 +206,7 @@ def split_transaction(
     child_date = part_date or txn.txn_date
     child_value = part_date or txn.value_date
     parent_tags = list(txn.tags or [])
+    sign = -1.0 if float(txn.amount) < 0 else 1.0
 
     created: list[Transaction] = []
     for i, part in enumerate(parts):
@@ -218,7 +219,7 @@ def split_transaction(
             reference=f"{base_ref}-split-{i + 1}-{stamp}",
             beneficiary=txn.beneficiary or "",
             purpose=txn.purpose or "",
-            amount=part["amount"],
+            amount=round(part["amount"] * sign, 2),
             direction=txn.direction,
             account=txn.account or "",
             category_id=part["category_id"],

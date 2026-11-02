@@ -1,4 +1,4 @@
-"""Import Bank Hapoalim, Discount Bank, and Isracard XLSX/CSV statements."""
+"""Import Bank Hapoalim, Discount Bank, Isracard, and Max XLSX/CSV statements."""
 
 from __future__ import annotations
 
@@ -32,6 +32,10 @@ from expense_tracker.services.importer.isracard import (
     rows_from_credit_card,
     _is_credit_card_raw,
 )
+from expense_tracker.services.importer.max import (
+    rows_from_max_workbook,
+    _is_max_credit_card_raw,
+)
 
 __all__ = [
     "excel_serial_to_date",
@@ -39,6 +43,7 @@ __all__ = [
     "rows_from_dataframe",
     "rows_from_credit_card",
     "rows_from_discount_credit_card",
+    "rows_from_max_workbook",
     "parse_file",
     "import_file",
 ]
@@ -47,7 +52,10 @@ __all__ = [
 def parse_file(file_bytes: bytes, filename: str) -> list[dict[str, Any]]:
     """Detect format and return normalized transaction dicts."""
     raw = _load_raw(file_bytes, filename)
-    if _is_credit_card_raw(raw):
+    if _is_max_credit_card_raw(raw):
+        rows = rows_from_max_workbook(file_bytes)
+        kind = "card"
+    elif _is_credit_card_raw(raw):
         rows = rows_from_credit_card(raw)
         kind = "card"
     elif _is_discount_credit_card_raw(raw):

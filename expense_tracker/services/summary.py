@@ -288,6 +288,82 @@ def search_suggestions(txns: list, query: str, limit: int = 8) -> list[dict[str,
     return options
 
 
+def month_label(lang: str, year: int, month: int) -> str:
+    he = (
+        "ינו",
+        "פבר",
+        "מרץ",
+        "אפר",
+        "מאי",
+        "יונ",
+        "יול",
+        "אוג",
+        "ספט",
+        "אוק",
+        "נוב",
+        "דצמ",
+    )
+    if lang == "he":
+        return f"{he[month - 1]} {year}"
+    return date(year, month, 1).strftime("%b %Y")
+
+
+def _months_between(start: tuple[int, int], end: tuple[int, int]):
+    year, month = start
+    while (year, month) <= end:
+        yield year, month
+        month += 1
+        if month == 13:
+            year += 1
+            month = 1
+
+
+def category_monthly_totals(session, category_id: int, lang: str) -> dict[str, Any] | None:
+    """Spending (or income) for one category, one bar per month.
+
+    Uses the same rows as the dashboard: display date, ignored rows left out,
+    split parents hidden, and bank card lumps hidden once card lines exist.
+    """
+    from expense_tracker.models import Category
+
+    cat = session.get(Category, category_id)
+    if cat is None:
+        return None
+    view = "income" if cat.kind == "income" else "expenses"
+    matched = [
+        txn
+        for txn in load_visible_transactions(session, view)
+        if txn.category_id == category_id and not is_ignored(txn)
+    ]
+    buckets: dict[tuple[int, int], float] = {}
+    for txn in matched:
+        shown = display_txn_date(txn)
+        key = (shown.year, shown.month)
+        buckets[key] = buckets.get(key, 0.0) + txn.amount
+
+    points: list[dict[str, Any]] = []
+    if buckets:
+        for year, month in _months_between(min(buckets), max(buckets)):
+            points.append(
+                {
+                    "key": f"{year:04d}-{month:02d}",
+                    "label": month_label(lang, year, month),
+                    "total": round(buckets.get((year, month), 0.0), 2),
+                }
+            )
+    grand = round(sum(point["total"] for point in points), 2)
+    count = len(points)
+    return {
+        "category_id": cat.id,
+        "name": category_name(lang, cat),
+        "color": cat.color,
+        "kind": cat.kind,
+        "months": points,
+        "total": grand,
+        "average": round(grand / count, 2) if count else 0.0,
+    }
+
+
 def load_visible_transactions(
     session,
     view: str,

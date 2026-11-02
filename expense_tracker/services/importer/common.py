@@ -30,7 +30,15 @@ def excel_serial_to_date(value: Any) -> date | None:
         return None
     if text.isdigit():
         return excel_serial_to_date(int(text))
-    for fmt in ("%d/%m/%Y", "%d.%m.%Y", "%Y-%m-%d", "%d/%m/%y", "%d.%m.%y", "%Y-%m-%d %H:%M:%S"):
+    for fmt in (
+        "%d/%m/%Y",
+        "%d.%m.%Y",
+        "%d-%m-%Y",
+        "%Y-%m-%d",
+        "%d/%m/%y",
+        "%d.%m.%y",
+        "%Y-%m-%d %H:%M:%S",
+    ):
         try:
             return datetime.strptime(text, fmt).date()
         except ValueError:

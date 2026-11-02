@@ -30,6 +30,7 @@ from expense_tracker.services.payloads import (
 from expense_tracker.services.summary import (
     available_months,
     build_summary,
+    category_monthly_totals,
     current_month_key,
     first_day_of_month,
     last_day_of_month,
@@ -165,6 +166,53 @@ def dashboard():
         cat_sort_direction=sort_direction,
         show_pie=show_pie(),
         openai_key_set=has_api_key(),
+        t=lambda k, **kw: t(current_lang, k, **kw),
+    )
+
+
+def _empty_page_summary() -> dict:
+    return {"pie": {"labels": [], "values": [], "colors": []}}
+
+
+@bp.route("/graphs")
+def graphs():
+    current_lang = lang()
+    raw_id = (request.args.get("category_id") or "").strip()
+    category_id = int(raw_id) if raw_id.isdigit() else None
+    with get_session() as session:
+        cats = sort_categories(
+            session.scalars(select(Category)).all(), current_lang
+        )
+        cats_json = [category_payload(current_lang, c) for c in cats]
+        rules_json = list_rule_payloads(current_lang, session)
+        tags_json = list_tag_payloads(session)
+        series = (
+            category_monthly_totals(session, category_id, current_lang)
+            if category_id is not None
+            else None
+        )
+    return render_template(
+        "graphs.html",
+        lang=current_lang,
+        dir=html_dir(current_lang),
+        view="graphs",
+        month="all",
+        date_from="",
+        date_from_month="",
+        date_to="",
+        date_to_month="",
+        using_range=False,
+        filter_period={},
+        categories=cats_json,
+        rules=rules_json,
+        tags=tags_json,
+        summary=_empty_page_summary(),
+        cat_sort=cat_sort_mode(),
+        cat_sort_direction=cat_sort_direction(),
+        show_pie=show_pie(),
+        openai_key_set=has_api_key(),
+        series=series,
+        selected_category_id=category_id if series else None,
         t=lambda k, **kw: t(current_lang, k, **kw),
     )
 

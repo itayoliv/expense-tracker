@@ -79,6 +79,44 @@ def test_split_creates_parts_and_keeps_categories(client):
         assert "SUPERMARKET" in (by_desc["Groceries"].details or "")
 
 
+def test_split_of_refund_keeps_negative_parts(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    shopping_id = _id_by_name_en(client, "Shopping")
+    tid = _add_txn(client, "הפניקס החזר ביטוח", 1343, date="2026-10-25")
+    with db.get_session() as session:
+        parent = session.get(Transaction, tid)
+        parent.amount = -1343
+        session.commit()
+
+    res = client.patch(
+        f"/transactions/{tid}",
+        json={
+            "splits": [
+                {"description": "Car", "amount": 800, "category_id": fuel_id},
+                {"description": "Home", "amount": 543, "category_id": shopping_id},
+            ]
+        },
+    )
+    assert res.status_code == 200
+    created_ids = res.get_json()["created_ids"]
+    with db.get_session() as session:
+        parts = list(
+            session.scalars(
+                select(Transaction).where(Transaction.id.in_(created_ids))
+            ).all()
+        )
+        by_desc = {part.description: part.amount for part in parts}
+        assert by_desc == {"Car": -800, "Home": -543}
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 10, 1),
+            date_to=date(2026, 10, 31),
+        )
+        assert summary["grand_total"] == -1343
+
+
 def test_split_inherits_parent_category_when_omitted(client):
     shopping_id = _id_by_name_en(client, "Shopping")
     tid = _add_txn(client, "אינפיניטי גמל", 100)

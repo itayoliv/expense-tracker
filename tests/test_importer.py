@@ -293,9 +293,116 @@ def test_discount_credit_card_parses_merchant_lines():
     assert gett["direction"] == "debit"
     assert gett["account"] == "6352"
     fee = by_desc["דמי  כרטיס בנק דיסקונט"]
-    assert fee["direction"] == "credit"
-    assert fee["amount"] == 8.3
+    assert fee["direction"] == "debit"
+    assert fee["amount"] == -8.3
     assert all(r["source"] == "card" for r in rows)
+
+
+def _isracard_refund_bytes() -> bytes:
+    rows = [
+        [None] * 9,
+        ["פירוט עסקאות", None, "נובמבר 2026", None, None, None, None, None, None],
+        [None] * 9,
+        [None] * 9,
+        ["קורפוריט - זהב - 4146", None, None, None, None, None, None, "₪ 12,998.60", None],
+        ["על שם בדיקה", None, None, None, None, None, None, "לחיוב ב-02.11", None],
+        [None] * 9,
+        [None] * 9,
+        [None] * 9,
+        [None] * 9,
+        [None] * 9,
+        ["עסקאות למועד חיוב", None, None, None, None, None, None, None, None],
+        [
+            "תאריך רכישה",
+            "שם בית עסק",
+            "סכום עסקה",
+            "מטבע עסקה",
+            "סכום חיוב",
+            "מטבע חיוב",
+            "מס' שובר",
+            "פירוט נוסף",
+            None,
+        ],
+        ["25.10.26", "אצל אלברטו", 15.1, "₪", 15.1, "₪", "379166413", None, None],
+        ["25.10.26", "הפניקס החזר ביטוח", -1343, "₪", -1343, "₪", "391667491", None, None],
+    ]
+    df = pd.DataFrame(rows)
+    buf = io.BytesIO()
+    df.to_excel(buf, header=False, index=False)
+    return buf.getvalue()
+
+
+def test_isracard_refund_stays_negative_debit():
+    rows = parse_file(_isracard_refund_bytes(), "4146_11_2026.xlsx")
+    by_desc = {row["description"]: row for row in rows}
+    charge = by_desc["אצל אלברטו"]
+    assert charge["direction"] == "debit"
+    assert charge["amount"] == 15.1
+    refund = by_desc["הפניקס החזר ביטוח"]
+    assert refund["txn_date"] == date(2026, 10, 25)
+    assert refund["direction"] == "debit"
+    assert refund["amount"] == -1343
+    assert refund["account"] == "4146"
+
+
+def test_isracard_refund_reduces_expenses_and_uses_rules(client):
+    from sqlalchemy import select
+
+    import expense_tracker.db as db
+    from expense_tracker.models import Category, Tag, Transaction
+    from expense_tracker.services.categorizer import remember_rule
+    from expense_tracker.services.importer import import_file
+    from expense_tracker.services.summary import build_summary
+
+    with db.get_session() as session:
+        insurance = session.scalars(
+            select(Category).where(Category.name_en == "Insurance")
+        ).one()
+        tag = Tag(name="policy", color="#2563EB")
+        session.add(tag)
+        session.flush()
+        remember_rule(session, "הפניקס", insurance.id, tags=[tag])
+        session.commit()
+        import_file(session, _isracard_refund_bytes(), "4146_11_2026.xlsx")
+        refund = session.scalars(
+            select(Transaction).where(Transaction.description == "הפניקס החזר ביטוח")
+        ).one()
+        refund_id = refund.id
+        assert refund.amount == -1343
+        assert refund.direction == "debit"
+        assert refund.category_id == insurance.id
+        assert [item.name for item in refund.tags] == ["policy"]
+        summary = build_summary(
+            session,
+            "expenses",
+            "en",
+            date_from=date(2026, 10, 1),
+            date_to=date(2026, 10, 31),
+        )
+        assert round(summary["grand_total"], 2) == -1327.9
+        assert round(summary["expense_total"], 2) == -1327.9
+
+    html = client.get(
+        "/?view=expenses&date_from=2026-10&date_to=2026-10"
+    ).get_data(as_text=True)
+    assert "הפניקס החזר ביטוח" in html
+    assert "-1,343.00" in html
+    assert "Insurance" in html
+    assert "policy" in html
+    income = client.get(
+        "/?view=income&date_from=2026-10&date_to=2026-10"
+    ).get_data(as_text=True)
+    assert "הפניקס החזר ביטוח" not in income
+
+    res = client.patch(
+        f"/transactions/{refund_id}",
+        json={"amount": 500},
+    )
+    assert res.status_code == 200
+    with db.get_session() as session:
+        saved = session.get(Transaction, refund_id)
+        assert saved is not None
+        assert saved.amount == -500
 
 
 def test_dashboard_month_uses_installment_slice_date(client):
@@ -377,3 +484,112 @@ def test_installment_uses_slice_date_regular_row_uses_purchase_date(client):
     assert "A I G" not in march
     assert "Regular cafe" in march
     assert "15/03/26" in march
+
+
+def _max_bytes() -> bytes:
+    billing = pd.DataFrame(
+        [
+            ["כל המשתמשים (1)"],
+            ["כל הכרטיסים (1)"],
+            ["09/2026"],
+            [
+                "תאריך עסקה",
+                "שם בית העסק",
+                "קטגוריה",
+                "4 ספרות אחרונות של כרטיס האשראי",
+                "סוג עסקה",
+                "סכום חיוב",
+                "מטבע חיוב",
+                "סכום עסקה מקורי",
+                "מטבע עסקה מקורי",
+                "תאריך חיוב",
+                "הערות",
+            ],
+            ["10-08-2026", "מקס נתניה", "שונות", "5719", "רגילה", 6.3, "₪", 6.3, "₪", "10-09-2026", None],
+            ["24-09-2026", "שולמן תכשיטים", "אופנה", "5719", "תשלומים", 343.35, "₪", 2060, "₪", "11-10-2026", "תשלום 1 מתוך 6"],
+            ["10-09-2026", "ויקטורי תל מונד", "מזון וצריכה", "5719", "רגילה", -26.9, "₪", 26.9, "₪", "11-10-2026", "ביטול עסקה"],
+            ["סך הכל", None, None, None, None, "322.75₪"],
+        ]
+    )
+    pending = pd.DataFrame(
+        [
+            ["כל המשתמשים (1)"],
+            ["11/2026"],
+            [
+                "תאריך עסקה",
+                "שם בית העסק",
+                "קטגוריה",
+                "4 ספרות אחרונות של כרטיס האשראי",
+                "סוג עסקה",
+                "סכום חיוב",
+                "מטבע חיוב",
+                "סכום עסקה מקורי",
+                "מטבע עסקה מקורי",
+            ],
+            ["11-10-2026", "סטוק", "חשמל ומחשבים", "5719", "רגילה", None, None, 27, "₪"],
+            ["סך הכל", None, None, None, None, 0],
+        ]
+    )
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf) as writer:
+        billing.to_excel(writer, sheet_name="עסקאות במועד החיוב", header=False, index=False)
+        pending.to_excel(writer, sheet_name="עסקאות שאושרו וטרם נקלטו", header=False, index=False)
+    return buf.getvalue()
+
+
+def test_max_export_parses_charges_refunds_and_skips_pending():
+    from expense_tracker.services.importer.isracard import PENDING_DETAILS
+
+    rows = parse_file(_max_bytes(), "transaction-details_export_1 - MAX.xlsx")
+    by_desc = {row["description"]: row for row in rows}
+    assert set(by_desc) == {"מקס נתניה", "שולמן תכשיטים", "ויקטורי תל מונד", "סטוק"}
+
+    purchase = by_desc["מקס נתניה"]
+    assert purchase["txn_date"] == date(2026, 8, 10)
+    assert purchase["value_date"] == date(2026, 9, 10)
+    assert purchase["amount"] == 6.3
+    assert purchase["direction"] == "debit"
+    assert purchase["account"] == "5719"
+    assert purchase["source"] == "card"
+
+    installment = by_desc["שולמן תכשיטים"]
+    assert installment["txn_date"] == date(2026, 9, 24)
+    assert installment["amount"] == 343.35
+    assert installment["details"] == "תשלום 1 מתוך 6"
+
+    refund = by_desc["ויקטורי תל מונד"]
+    assert refund["direction"] == "debit"
+    assert refund["amount"] == -26.9
+    assert refund["details"] == "ביטול עסקה"
+
+    assert by_desc["סטוק"]["details"] == PENDING_DETAILS
+    assert by_desc["סטוק"]["amount"] == 27
+
+
+def test_max_import_skips_unposted_sheet(client):
+    from sqlalchemy import select
+
+    import expense_tracker.db as db
+    from expense_tracker.models import Transaction
+    from expense_tracker.services.importer import import_file
+    from expense_tracker.services.installments import add_months
+
+    data = _max_bytes()
+    with db.get_session() as session:
+        result = import_file(session, data, "transaction-details_export_1 - MAX.xlsx")
+        stored = list(session.scalars(select(Transaction)).all())
+        installment = next(txn for txn in stored if "שולמן" in txn.description)
+
+    assert result["added"] == 3
+    assert result["skipped"] == 1
+    assert {txn.description for txn in stored} == {
+        "מקס נתניה",
+        "שולמן תכשיטים",
+        "ויקטורי תל מונד",
+    }
+    assert installment.installment_date == add_months(date(2026, 9, 24), 0)
+
+    with db.get_session() as session:
+        again = import_file(session, data, "transaction-details_export_1 - MAX.xlsx")
+    assert again["added"] == 0
+    assert again["skipped"] == 4

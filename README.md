@@ -1,6 +1,6 @@
 # Expense Tracker (EN / עברית)
 
-Local Python Flask app that imports Bank Hapoalim and Isracard monthly CSV/XLSX files into SQLite and shows a bilingual expense dashboard with pie chart, expandable categories, and recategorization.
+Local Python Flask app that imports Bank Hapoalim, Isracard, and Max monthly CSV/XLSX files into SQLite and shows a bilingual expense dashboard with pie chart, expandable categories, and recategorization.
 
 ![Expense Tracker dashboard](docs/screenshot.png)
 
@@ -54,7 +54,7 @@ Before any schema migration, the app copies `data/expenses.db` to `data/backups/
 
 ## Versioning
 
-This project uses [Semantic Versioning](https://semver.org/). Current version: **0.5.0-1** (see [CHANGELOG.md](CHANGELOG.md)).
+This project uses [Semantic Versioning](https://semver.org/). Current version: **0.5.0-2** (see [CHANGELOG.md](CHANGELOG.md)).
 
 - Bump `PATCH` for bug fixes and small internal improvements.
 - Bump `MINOR` for new features that keep existing behavior working.
@@ -89,7 +89,8 @@ Then open [http://127.0.0.1:5000](http://127.0.0.1:5000).
 
 1. Click **Import file** / **ייבוא קובץ** and upload either:
    - a Hapoalim **account movements** export, or
-   - an Isracard **פירוט עסקאות** credit-card details export (`.xlsx` or `.csv`).
+   - an Isracard **פירוט עסקאות** credit-card details export (`.xlsx` or `.csv`), or
+   - a Max **transaction-details** export (`.xlsx`). Charges on the sheet **עסקאות שאושרו וטרם נקלטו** are skipped until they appear on a billed sheet.
 2. Switch language with **EN** / **עב** in the sidebar.
 3. Filter by month or from/to dates; switch **Expenses**, **Income**, or **Bottom line**.
 4. Expand a category to see transactions; use the pencil to edit or recategorize (optionally “remember” the rule).

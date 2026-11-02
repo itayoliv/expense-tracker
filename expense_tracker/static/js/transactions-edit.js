@@ -89,7 +89,10 @@
         const customInput = document.getElementById("txn-custom-description");
         if (customInput) customInput.value = data.custom_description || "";
         setTxnOriginalFieldsReadonly(true);
-        document.getElementById("txn-amount").value = data.amount;
+        const amount = Number(data.amount);
+        document.getElementById("txn-amount").value = Number.isFinite(amount)
+          ? Math.abs(amount)
+          : data.amount;
         document.getElementById("txn-direction").value = data.direction || "debit";
         document.getElementById("txn-category").value = data.category_id || "";
         setTagPickerSelection(
