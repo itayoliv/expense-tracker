@@ -248,3 +248,36 @@ def test_manual_date_edit_moves_slice_to_new_month(client):
     august = client.get("/?view=expenses&date_from=2026-08").get_data(as_text=True)
     assert "KSP" in august
     assert "16/08/26" in august
+
+
+def test_edit_keeps_purchase_date_of_imported_installment(client):
+    import expense_tracker.db as db
+    from expense_tracker.models import Transaction
+
+    with db.get_session() as session:
+        txn = Transaction(
+            txn_date=date(2026, 9, 13),
+            description="קרית חינוך בן גוריון",
+            details="תשלום 2 מתוך 8",
+            reference="112012394",
+            amount=213,
+            direction="debit",
+            source="card",
+            is_manual=False,
+        )
+        session.add(txn)
+        session.commit()
+        tid = txn.id
+
+    res = client.patch(
+        f"/transactions/{tid}",
+        json={"date": "2026-10-13", "custom_description": "חוג"},
+        headers={"X-Requested-With": "XMLHttpRequest"},
+    )
+    assert res.get_json()["ok"]
+
+    with db.get_session() as session:
+        saved = session.get(Transaction, tid)
+        assert saved.txn_date == date(2026, 9, 13)
+        assert saved.installment_date == date(2026, 10, 13)
+        assert saved.custom_description == "חוג"

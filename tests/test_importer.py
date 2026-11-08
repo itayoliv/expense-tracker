@@ -175,6 +175,33 @@ def test_reimport_updates_billing_date(client, tmp_path):
     assert dynamika.value_date == date(2026, 9, 10)
 
 
+def test_reimport_restores_installment_stored_with_slice_date(client):
+    from sqlalchemy import select
+
+    import expense_tracker.db as db
+    from expense_tracker.models import Transaction
+    from expense_tracker.services.importer import import_file
+
+    data = _isracard_bytes()
+    with db.get_session() as session:
+        import_file(session, data, "0423_09_2026.xlsx")
+        dynamika = session.scalars(
+            select(Transaction).where(Transaction.description == "דינמיקה רננים")
+        ).one()
+        dynamika.txn_date = date(2026, 9, 6)
+        session.commit()
+
+    with db.get_session() as session:
+        second = import_file(session, data, "0423_09_2026 (1).xlsx")
+        rows = session.scalars(
+            select(Transaction).where(Transaction.description == "דינמיקה רננים")
+        ).all()
+    assert second["added"] == 0
+    assert len(rows) == 1
+    assert rows[0].txn_date == date(2026, 7, 6)
+    assert rows[0].installment_date == date(2026, 9, 6)
+
+
 def _discount_bank_bytes() -> bytes:
     rows = [
         ["עובר ושב"] + [None] * 7,

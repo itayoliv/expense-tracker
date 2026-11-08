@@ -122,7 +122,9 @@ def update_transaction(txn_id: int):
             if float(txn.amount) < 0:
                 updated = -updated
             txn.amount = updated
-        if "date" in payload and payload["date"]:
+        # Imported rows keep the statement's purchase date: import dedup and the
+        # installment slice date both depend on it.
+        if "date" in payload and payload["date"] and txn.is_manual:
             txn.txn_date = parse_txn_date(payload["date"])
         if "category_id" in payload:
             cid = payload["category_id"]

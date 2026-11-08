@@ -41,6 +41,11 @@
     if (customInput && !readonly) customInput.value = "";
   }
 
+  function setTxnDateReadonly(readonly) {
+    const dateInput = document.getElementById("txn-date");
+    if (dateInput) dateInput.readOnly = Boolean(readonly);
+  }
+
   function syncIgnoreReasonVisibility() {
     const ignoredBox = document.getElementById("txn-ignored");
     const reasonWrap = document.getElementById("txn-ignore-reason-wrap");
@@ -67,6 +72,7 @@
     if (txn.setSplitMode) txn.setSplitMode(false);
     if (btnSplitToggle) btnSplitToggle.classList.add("hidden");
     setTxnOriginalFieldsReadonly(false);
+    setTxnDateReadonly(false);
     setIgnoreFields(false, false, "");
     setTagPickerSelection(document.getElementById("txn-tag-picker"), []);
   }
@@ -89,6 +95,7 @@
         const customInput = document.getElementById("txn-custom-description");
         if (customInput) customInput.value = data.custom_description || "";
         setTxnOriginalFieldsReadonly(true);
+        setTxnDateReadonly(!data.is_manual);
         const amount = Number(data.amount);
         document.getElementById("txn-amount").value = Number.isFinite(amount)
           ? Math.abs(amount)

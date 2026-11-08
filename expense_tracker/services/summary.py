@@ -214,6 +214,7 @@ def serialize_txn(lang: str, x) -> dict[str, Any]:
         "custom_description": getattr(x, "custom_description", "") or "",
         "date": display_txn_date(x).strftime("%d/%m/%y"),
         "purchase_date": x.txn_date.isoformat(),
+        "is_manual": bool(getattr(x, "is_manual", False)),
         "amount": x.amount,
         "direction": x.direction,
         "category_id": x.category_id,

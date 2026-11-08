@@ -36,6 +36,7 @@ from expense_tracker.services.importer.max import (
     rows_from_max_workbook,
     _is_max_credit_card_raw,
 )
+from expense_tracker.services.installments import installment_date_for
 
 __all__ = [
     "excel_serial_to_date",
@@ -97,6 +98,33 @@ def _pending_twin(session: Session, row: dict[str, Any]) -> Transaction | None:
     return None
 
 
+def _shifted_installment_twin(session: Session, row: dict[str, Any]) -> Transaction | None:
+    """Same payment slice stored with its slice date as the purchase date.
+
+    An older edit bug saved the displayed slice date into txn_date, so the
+    exact dedup key no longer matched and the next import added a second copy.
+    """
+    slice_date = installment_date_for(row["txn_date"], row["details"], row["description"])
+    if slice_date is None or slice_date == row["txn_date"]:
+        return None
+    candidates = session.scalars(
+        select(Transaction).where(
+            Transaction.txn_date == slice_date,
+            Transaction.reference == row["reference"],
+            Transaction.amount == row["amount"],
+            Transaction.description == row["description"],
+            Transaction.direction == row["direction"],
+            Transaction.details == row["details"],
+            Transaction.is_manual.is_(False),
+        )
+    ).all()
+    for txn in candidates:
+        if txn.account and row["account"] and txn.account != row["account"]:
+            continue
+        return txn
+    return None
+
+
 def import_file(
     session: Session, file_bytes: bytes, filename: str
 ) -> dict[str, int]:
@@ -134,6 +162,15 @@ def import_file(
             if pending is not None and pending.id != exists.id:
                 session.delete(pending)
                 merged += 1
+            skipped += 1
+            continue
+
+        shifted = _shifted_installment_twin(session, row)
+        if shifted is not None:
+            shifted.txn_date = row["txn_date"]
+            if row.get("value_date"):
+                shifted.value_date = row["value_date"]
+            merged += 1
             skipped += 1
             continue
 

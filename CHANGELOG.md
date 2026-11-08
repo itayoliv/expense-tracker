@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.5.0-3 - 2026-11-08
+
+Build **3** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-3**.
+
+### Transactions
+
+- Editing an imported transaction no longer changes its purchase date. The date field is read-only for imported rows, so an installment stays in the month of its payment. Rows added by hand can still have their date changed.
+
+### Import
+
+- Importing a statement again repairs an installment whose purchase date was saved as its payment date, instead of adding a second copy of that payment.
+
 ## 0.5.0-2 - 2026-11-02
 
 Build **2** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-2**.
