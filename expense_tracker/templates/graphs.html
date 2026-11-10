@@ -10,11 +10,11 @@
     <nav class="nav">
       <div class="nav-section">
         <div class="nav-label">{{ t('nav_snapshot') }}</div>
-        <a class="nav-link" href="{{ url_for('pages.dashboard', view='expenses') }}">{{ t('expenses') }}</a>
-        <a class="nav-link" href="{{ url_for('pages.dashboard', view='income') }}">{{ t('income') }}</a>
-        <a class="nav-link" href="{{ url_for('pages.dashboard', view='bottom') }}">{{ t('bottom_line') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='expenses', **filter_period) }}">{{ t('expenses') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='income', **filter_period) }}">{{ t('income') }}</a>
+        <a class="nav-link" href="{{ url_for('pages.dashboard', view='bottom', **filter_period) }}">{{ t('bottom_line') }}</a>
         <a class="nav-link" href="{{ url_for('investments.investments') }}">{{ t('investments') }}</a>
-        <a class="nav-link active" href="{{ url_for('pages.graphs') }}">{{ t('graphs') }}</a>
+        <a class="nav-link active" href="{{ url_for('pages.graphs', **(graphs_period if graphs_period is defined else filter_period)) }}">{{ t('graphs') }}</a>
       </div>
       <div class="nav-section">
         <button type="button" class="nav-link nav-btn" id="btn-manage-categories">{{ t('manage_categories') }}</button>
@@ -48,8 +48,8 @@
       </div>
     </header>
 
-    <form class="graphs-picker" method="get" action="{{ url_for('pages.graphs') }}">
-      <label>
+    <form class="graphs-picker period-form" method="get" action="{{ url_for('pages.graphs') }}" id="graphs-form">
+      <label class="graphs-category">
         {{ t('category') }}
         <select name="category_id" onchange="this.form.submit()">
           <option value="">{{ t('choose_category') }}</option>
@@ -58,6 +58,13 @@
           {% endfor %}
         </select>
       </label>
+      <div class="period-range">
+        <label for="date_from">{{ t('date_from') }}</label>
+        <input type="month" name="date_from" id="date_from" value="{{ date_from_month }}">
+        <label for="date_to">{{ t('date_to') }}</label>
+        <input type="month" name="date_to" id="date_to" value="{{ date_to_month }}"{% if date_from_month %} min="{{ date_from_month }}"{% endif %}>
+        <button type="submit" class="btn ghost" id="btn-apply-range">{{ t('apply_range') }}</button>
+      </div>
     </form>
 
     {% if series %}
@@ -67,6 +74,7 @@
           <div class="graphs-stats">
             <span>{{ t('graphs_total') }}: {{ money(series.total) }}</span>
             <span>{{ t('graphs_average') }}: {{ money(series.average) }}</span>
+            <span>{{ t('graphs_payments') }}: {{ money(series.payments_total) }}</span>
           </div>
           <div class="graphs-canvas-wrap">
             <canvas id="category-month-chart"></canvas>
@@ -75,25 +83,41 @@
             <thead>
               <tr>
                 <th>{{ t('month') }}</th>
+                <th title="{{ t('txn_count_payments_hint') }}">{{ t('txn_count_payments') }}</th>
                 <th>{{ t('amount') }}</th>
+                <th>{{ t('graphs_payments') }}</th>
               </tr>
             </thead>
             <tbody>
               {% for point in series.months %}
               <tr>
                 <td>{{ point.label }}</td>
+                <td><span class="count-frac">{{ point.count }} / {{ point.payment_count }}</span></td>
                 <td>{{ money(point.total) }}</td>
+                <td>{{ money(point.payments_total) }}</td>
               </tr>
               {% endfor %}
             </tbody>
             <tfoot>
               <tr>
+                <th>{{ t('graphs_total') }}</th>
+                <td><span class="count-frac">{{ series.count }} / {{ series.payment_count }}</span></td>
+                <td>{{ money(series.total) }}</td>
+                <td>{{ money(series.payments_total) }}</td>
+              </tr>
+              <tr>
                 <th>{{ t('graphs_average') }}</th>
+                <td></td>
                 <td>{{ money(series.average) }}</td>
+                <td></td>
               </tr>
             </tfoot>
           </table>
-          <script id="graphs-series" type="application/json" data-average-label="{{ t('graphs_average') }}">{{ series|tojson }}</script>
+          <script id="graphs-series" type="application/json"
+                  data-average-label="{{ t('graphs_average') }}"
+                  data-total-label="{{ t('amount') }}"
+                  data-payments-label="{{ t('graphs_payments') }}"
+                  data-count-label="{{ t('txn_count_payments_hint') }}">{{ series|tojson }}</script>
         {% else %}
           <p class="muted-note">{{ t('graphs_empty') }}</p>
         {% endif %}

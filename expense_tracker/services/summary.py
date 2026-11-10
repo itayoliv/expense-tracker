@@ -319,11 +319,18 @@ def _months_between(start: tuple[int, int], end: tuple[int, int]):
             month = 1
 
 
-def category_monthly_totals(session, category_id: int, lang: str) -> dict[str, Any] | None:
+def category_monthly_totals(
+    session,
+    category_id: int,
+    lang: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, Any] | None:
     """Spending (or income) for one category, one bar per month.
 
     Uses the same rows as the dashboard: display date, ignored rows left out,
     split parents hidden, and bank card lumps hidden once card lines exist.
+    Each month also carries its installment-payment amount and counts.
     """
     from expense_tracker.models import Category
 
@@ -331,25 +338,39 @@ def category_monthly_totals(session, category_id: int, lang: str) -> dict[str, A
     if cat is None:
         return None
     view = "income" if cat.kind == "income" else "expenses"
+    start, end = resolve_date_range(date_from, date_to)
     matched = [
         txn
-        for txn in load_visible_transactions(session, view)
+        for txn in load_visible_transactions(session, view, start, end)
         if txn.category_id == category_id and not is_ignored(txn)
     ]
-    buckets: dict[tuple[int, int], float] = {}
+    buckets: dict[tuple[int, int], dict[str, float]] = {}
     for txn in matched:
         shown = display_txn_date(txn)
-        key = (shown.year, shown.month)
-        buckets[key] = buckets.get(key, 0.0) + txn.amount
+        bucket = buckets.setdefault(
+            (shown.year, shown.month),
+            {"total": 0.0, "payments_total": 0.0, "count": 0, "payment_count": 0},
+        )
+        bucket["total"] += txn.amount
+        bucket["count"] += 1
+        if is_installment(txn):
+            bucket["payments_total"] += txn.amount
+            bucket["payment_count"] += 1
 
+    first = (start.year, start.month) if start else (min(buckets) if buckets else None)
+    last = (end.year, end.month) if end else (max(buckets) if buckets else None)
     points: list[dict[str, Any]] = []
-    if buckets:
-        for year, month in _months_between(min(buckets), max(buckets)):
+    if first and last:
+        for year, month in _months_between(first, last):
+            bucket = buckets.get((year, month), {})
             points.append(
                 {
                     "key": f"{year:04d}-{month:02d}",
                     "label": month_label(lang, year, month),
-                    "total": round(buckets.get((year, month), 0.0), 2),
+                    "total": round(bucket.get("total", 0.0), 2),
+                    "payments_total": round(bucket.get("payments_total", 0.0), 2),
+                    "count": int(bucket.get("count", 0)),
+                    "payment_count": int(bucket.get("payment_count", 0)),
                 }
             )
     grand = round(sum(point["total"] for point in points), 2)
@@ -361,6 +382,9 @@ def category_monthly_totals(session, category_id: int, lang: str) -> dict[str, A
         "kind": cat.kind,
         "months": points,
         "total": grand,
+        "payments_total": round(sum(p["payments_total"] for p in points), 2),
+        "count": sum(p["count"] for p in points),
+        "payment_count": sum(p["payment_count"] for p in points),
         "average": round(grand / count, 2) if count else 0.0,
     }
 

@@ -6,6 +6,16 @@ This project follows [Semantic Versioning](https://semver.org/).
 
 Build numbers (`-N`) mark interim builds without bumping `MAJOR.MINOR.PATCH`. Example: **0.4.2-3** is still release **0.4.2**, build **3**. Older notes used `+N` for the same idea.
 
+## 0.5.0-4 - 2026-11-11
+
+Build **4** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-4**.
+
+### Graphs
+
+- The Graphs page uses the same month range as Expenses, and opens on the current month. A range chosen on Expenses stays selected when you open Graphs.
+- Each month has a second bar for how much of that month came from installment payments. The table adds the transactions / payments count and the payments amount.
+- In Hebrew, that count stays transactions / payments, matching the expenses table.
+
 ## 0.5.0-3 - 2026-11-08
 
 Build **3** under **0.5.0**. Core version unchanged. Shown in the app as **0.5.0-3**.

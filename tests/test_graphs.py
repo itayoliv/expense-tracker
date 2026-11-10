@@ -1,5 +1,7 @@
 """Category monthly graph."""
 
+from datetime import date
+
 
 def _id_by_name_en(client, name_en: str) -> int:
     cats = client.get("/api/categories").get_json()["categories"]
@@ -28,7 +30,8 @@ def test_graphs_nav_and_monthly_totals(client):
     assert page.status_code == 200
     html = page.get_data(as_text=True)
     assert "Graphs" in html
-    assert 'href="/graphs"' in html
+    assert 'href="/graphs?' in html
+    assert f'value="{date.today():%Y-%m}"' in html
 
     fuel_id = _id_by_name_en(client, "Fuel and transport")
     shopping_id = _id_by_name_en(client, "Shopping")
@@ -43,7 +46,9 @@ def test_graphs_nav_and_monthly_totals(client):
     )
     assert patched.status_code == 200
 
-    shown = client.get(f"/graphs?category_id={fuel_id}").get_data(as_text=True)
+    shown = client.get(
+        f"/graphs?category_id={fuel_id}&date_from=&date_to="
+    ).get_data(as_text=True)
     assert "Fuel and transport" in shown
     assert "Jan 2026" in shown
     assert "140.00" in shown
@@ -68,10 +73,46 @@ def test_graphs_uses_installment_month(client):
         fuel_id,
         details="תשלום 3 מתוך 3",
     )
-    shown = client.get(f"/graphs?category_id={fuel_id}").get_data(as_text=True)
+    shown = client.get(
+        f"/graphs?category_id={fuel_id}&date_from=&date_to="
+    ).get_data(as_text=True)
     assert "Mar 2026" in shown
     assert "50.00" in shown
     assert "Jan 2026" not in shown
+
+
+def test_graphs_date_range_and_payments(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    _add(client, "Paz", 30, "2026-02-05", fuel_id)
+    _add(client, "KSP", 70, "2026-03-10", fuel_id, details="תשלום 1 מתוך 2")
+    _add(client, "Paz May", 11, "2026-05-01", fuel_id)
+
+    shown = client.get(
+        f"/graphs?category_id={fuel_id}&date_from=2026-01&date_to=2026-04"
+    ).get_data(as_text=True)
+    assert 'value="2026-01"' in shown
+    assert 'value="2026-04"' in shown
+    assert "Jan 2026" in shown
+    assert "Apr 2026" in shown
+    assert "May 2026" not in shown
+    assert "1 / 1" in shown
+    assert "70.00" in shown
+    assert "2 / 1" in shown
+    assert "100.00" in shown
+    assert "25.00" in shown
+    assert "Installment payments" in shown
+
+
+def test_graphs_defaults_to_current_month(client):
+    fuel_id = _id_by_name_en(client, "Fuel and transport")
+    today = date.today()
+    _add(client, "This month", 15, today.isoformat(), fuel_id)
+    _add(client, "Last year", 99, date(today.year - 1, today.month, 1).isoformat(), fuel_id)
+
+    shown = client.get(f"/graphs?category_id={fuel_id}").get_data(as_text=True)
+    assert f'value="{today:%Y-%m}"' in shown
+    assert "15.00" in shown
+    assert "99.00" not in shown
 
 
 def test_graphs_hebrew_label(client):
@@ -80,5 +121,7 @@ def test_graphs_hebrew_label(client):
     assert "גרפים" in page.get_data(as_text=True)
     fuel_id = _id_by_name_en(client, "Fuel and transport")
     _add(client, "Paz", 10, "2026-10-04", fuel_id)
-    shown = client.get(f"/graphs?category_id={fuel_id}").get_data(as_text=True)
+    shown = client.get(
+        f"/graphs?category_id={fuel_id}&date_from=&date_to="
+    ).get_data(as_text=True)
     assert "אוק 2026" in shown

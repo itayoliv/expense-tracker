@@ -179,6 +179,9 @@ def graphs():
     current_lang = lang()
     raw_id = (request.args.get("category_id") or "").strip()
     category_id = int(raw_id) if raw_id.isdigit() else None
+    date_from, date_to, explicit_range = _dashboard_dates()
+    if date_from and date_to and date_from > date_to:
+        date_to = last_day_of_month(date_from)
     with get_session() as session:
         cats = sort_categories(
             session.scalars(select(Category)).all(), current_lang
@@ -187,10 +190,25 @@ def graphs():
         rules_json = list_rule_payloads(current_lang, session)
         tags_json = list_tag_payloads(session)
         series = (
-            category_monthly_totals(session, category_id, current_lang)
+            category_monthly_totals(
+                session, category_id, current_lang, date_from, date_to
+            )
             if category_id is not None
             else None
         )
+    date_from_raw = date_from.isoformat() if date_from else ""
+    date_to_raw = date_to.isoformat() if date_to else ""
+    filter_period: dict[str, str] = {}
+    if date_from_raw:
+        filter_period["date_from"] = date_from_raw
+    if date_to_raw:
+        filter_period["date_to"] = date_to_raw
+    if explicit_range and not date_from_raw and not date_to_raw:
+        filter_period["date_from"] = ""
+        filter_period["date_to"] = ""
+    graphs_period = dict(filter_period)
+    if category_id is not None:
+        graphs_period["category_id"] = str(category_id)
     return render_template(
         "graphs.html",
         lang=current_lang,
@@ -198,11 +216,12 @@ def graphs():
         view="graphs",
         month="all",
         date_from="",
-        date_from_month="",
+        date_from_month=date_from.strftime("%Y-%m") if date_from else "",
         date_to="",
-        date_to_month="",
-        using_range=False,
-        filter_period={},
+        date_to_month=date_to.strftime("%Y-%m") if date_to else "",
+        using_range=explicit_range and (date_from is not None or date_to is not None),
+        filter_period=filter_period,
+        graphs_period=graphs_period,
         categories=cats_json,
         rules=rules_json,
         tags=tags_json,

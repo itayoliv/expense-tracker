@@ -16,7 +16,25 @@
   const currency = (window.APP && window.APP.strings && window.APP.strings.currency) || "";
   const color = series.color || "#6B7280";
   const averageLabel = node.dataset.averageLabel || "";
+  const totalLabel = node.dataset.totalLabel || "";
+  const paymentsLabel = node.dataset.paymentsLabel || "";
+  const countLabel = node.dataset.countLabel || "";
   const average = Number(series.average) || 0;
+  const hebrew = window.APP && window.APP.lang === "he";
+
+  function formatCounts(point) {
+    const counts = `${point.count} / ${point.payment_count}`;
+    // Keep transactions/payments left to right. Hebrew would otherwise show 1/7.
+    return hebrew ? `\u2066${counts}\u2069` : counts;
+  }
+
+  function formatMoney(raw) {
+    const value = Number(raw || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return currency ? `${value} ${currency}` : value;
+  }
 
   new Chart(canvas, {
     data: {
@@ -24,11 +42,23 @@
       datasets: [
         {
           type: "bar",
+          label: totalLabel,
           data: months.map((point) => point.total),
           backgroundColor: color,
           borderRadius: 6,
           maxBarThickness: 48,
           order: 2,
+        },
+        {
+          type: "bar",
+          label: paymentsLabel,
+          data: months.map((point) => point.payments_total),
+          backgroundColor: `${color}66`,
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 6,
+          maxBarThickness: 48,
+          order: 3,
         },
         {
           type: "line",
@@ -46,23 +76,20 @@
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
       plugins: {
-        legend: {
-          display: true,
-          labels: {
-            filter(item) {
-              return item.datasetIndex === 1;
-            },
-          },
-        },
+        legend: { display: true },
         tooltip: {
           callbacks: {
             label(item) {
-              const value = Number(item.raw || 0).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
-              return currency ? `${value} ${currency}` : value;
+              const money = formatMoney(item.raw);
+              return item.dataset.label ? `${item.dataset.label}: ${money}` : money;
+            },
+            footer(items) {
+              const point = items.length ? months[items[0].dataIndex] : null;
+              if (!point) return "";
+              const counts = formatCounts(point);
+              return countLabel ? `${countLabel}: ${counts}` : counts;
             },
           },
         },

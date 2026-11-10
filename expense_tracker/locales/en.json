@@ -209,6 +209,7 @@
   "graphs_empty": "This category has no transactions.",
   "graphs_total": "Total",
   "graphs_average": "Monthly average",
+  "graphs_payments": "Installment payments",
   "portfolio": "Portfolio",
   "symbol": "Symbol",
   "holding_name": "Name",
